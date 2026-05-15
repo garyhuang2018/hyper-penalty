@@ -257,96 +257,125 @@
 
         // Draw stadium background
         function drawStadium() {
-            // Sky/stands gradient
-            const skyGrad = ctx.createLinearGradient(0, 0, 0, 150);
-            skyGrad.addColorStop(0, '#1a1a2e');
-            skyGrad.addColorStop(1, '#2d2d5a');
+            // Clean sky gradient
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, 180);
+            skyGrad.addColorStop(0, '#1e3a5f');
+            skyGrad.addColorStop(1, '#3d5a80');
             ctx.fillStyle = skyGrad;
-            ctx.fillRect(0, 0, 900, 150);
+            ctx.fillRect(0, 0, 900, 180);
 
-            // Crowd silhouette
-            ctx.fillStyle = '#0f0f23';
-            for (let i = 0; i < 900; i += 8) {
-                const h = 20 + Math.random() * 15;
-                ctx.fillRect(i, 130 - h, 6, h);
-            }
-
-            // Field (trapezoid for perspective)
-            ctx.fillStyle = COLORS.grassDark;
+            // Stadium seats (simple arc pattern)
+            ctx.fillStyle = '#c9302c';
             ctx.beginPath();
-            ctx.moveTo(100, 150);   // top-left
-            ctx.lineTo(800, 150);   // top-right
-            ctx.lineTo(900, 650);   // bottom-right
-            ctx.lineTo(0, 650);     // bottom-left
+            ctx.moveTo(0, 180);
+            for (let x = 0; x <= 900; x += 15) {
+                const h = 25 + Math.sin(x * 0.02) * 8;
+                ctx.lineTo(x, 180 - h);
+            }
+            ctx.lineTo(900, 180);
             ctx.closePath();
             ctx.fill();
 
-            // Grass stripes
+            // Seats highlight
+            ctx.fillStyle = '#e04b4b';
+            ctx.beginPath();
+            ctx.moveTo(0, 180);
+            for (let x = 0; x <= 900; x += 15) {
+                const h = 15 + Math.sin(x * 0.02 + 1) * 5;
+                ctx.lineTo(x, 180 - h);
+            }
+            ctx.lineTo(900, 180);
+            ctx.closePath();
+            ctx.fill();
+
+            // Field base (trapezoid perspective)
+            ctx.fillStyle = '#1a6b1a';
+            ctx.beginPath();
+            ctx.moveTo(80, 170);
+            ctx.lineTo(820, 170);
+            ctx.lineTo(920, 660);
+            ctx.lineTo(-20, 660);
+            ctx.closePath();
+            ctx.fill();
+
+            // Clean grass pattern - parallel lines for perspective
             ctx.save();
             ctx.clip();
-            for (let i = -5; i < 15; i++) {
-                ctx.fillStyle = i % 2 === 0 ? COLORS.grassDark : COLORS.grassLight;
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 2;
+            for (let y = 170; y < 660; y += 20) {
+                const progress = (y - 170) / 490;
+                const startX = 80 + progress * (-100);
+                const endX = 820 + progress * 100;
                 ctx.beginPath();
-                ctx.moveTo(100 + i * 80, 150);
-                ctx.lineTo(100 + (i + 1) * 80, 150);
-                ctx.lineTo(100 + (i + 1.5) * 80, 650);
-                ctx.lineTo(100 + (i + 0.5) * 80, 650);
-                ctx.closePath();
-                ctx.fill();
+                ctx.moveTo(startX, y);
+                ctx.lineTo(endX, y);
+                ctx.stroke();
             }
             ctx.restore();
 
-            // Field lines (adjusted for perspective)
-            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-            ctx.lineWidth = 3;
-
-            // Goal area (top rectangle)
+            // Center circle arc hint (subtle)
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(280, 150);
-            ctx.lineTo(620, 150);
-            ctx.lineTo(660, 230);
-            ctx.lineTo(240, 230);
-            ctx.closePath();
+            ctx.arc(450, 550, 120, Math.PI, Math.PI * 2);
+            ctx.stroke();
+
+            // Penalty area - top goal
+            ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(250, 170);
+            ctx.lineTo(220, 170);
+            ctx.lineTo(220, 260);
+            ctx.lineTo(680, 260);
+            ctx.lineTo(680, 170);
+            ctx.lineTo(650, 170);
             ctx.stroke();
 
             // Goal box
             ctx.beginPath();
-            ctx.moveTo(350, 150);
-            ctx.lineTo(550, 150);
-            ctx.lineTo(580, 280);
-            ctx.lineTo(320, 280);
-            ctx.closePath();
+            ctx.moveTo(330, 170);
+            ctx.lineTo(310, 170);
+            ctx.lineTo(310, 320);
+            ctx.lineTo(590, 320);
+            ctx.lineTo(590, 170);
+            ctx.lineTo(570, 170);
             ctx.stroke();
 
             // Penalty spot
             ctx.fillStyle = '#fff';
             ctx.beginPath();
-            ctx.arc(450, 480, 6, 0, Math.PI * 2);
+            ctx.arc(450, 450, 5, 0, Math.PI * 2);
             ctx.fill();
 
-            // Goal frame
-            ctx.strokeStyle = '#f0f0f0';
-            ctx.lineWidth = 8;
+            // Goal frame (white posts)
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 10;
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(300, 150);
-            ctx.lineTo(300, 80);
-            ctx.lineTo(600, 80);
-            ctx.lineTo(600, 150);
+            ctx.moveTo(280, 170);
+            ctx.lineTo(280, 85);
+            ctx.lineTo(620, 85);
+            ctx.lineTo(620, 170);
             ctx.stroke();
+            ctx.lineCap = 'butt';
 
-            // Net pattern
-            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            // Net (simple grid)
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
             ctx.lineWidth = 1;
-            for (let x = 300; x <= 600; x += 25) {
+            // Vertical net lines
+            for (let x = 280; x <= 620; x += 25) {
                 ctx.beginPath();
-                ctx.moveTo(x, 80);
-                ctx.lineTo(x + (x - 450) * 0.15, 150);
+                ctx.moveTo(x, 85);
+                ctx.lineTo(x + (x - 450) * 0.12, 170);
                 ctx.stroke();
             }
-            for (let y = 80; y <= 150; y += 15) {
+            // Horizontal net lines
+            for (let y = 85; y <= 170; y += 18) {
                 ctx.beginPath();
-                ctx.moveTo(300, y);
-                ctx.lineTo(600, y);
+                ctx.moveTo(280 + (y - 85) * 0.5, y);
+                ctx.lineTo(620 - (y - 85) * 0.5, y);
                 ctx.stroke();
             }
         }
@@ -489,8 +518,8 @@
 
         // Draw title screen
         function drawTitle() {
-            // Dramatic gradient overlay
-            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            // Clean overlay
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
             ctx.fillRect(0, 0, 900, 650);
 
             // Title
