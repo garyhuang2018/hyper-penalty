@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>热血点球大战</title>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --grass-dark: #1a5c1a;
+            --grass-light: #2d8a2d;
+            --pitch-line: rgba(255,255,255,0.9);
+            --goal-frame: #f0f0f0;
+            --net-color: rgba(255,255,255,0.4);
+            --ball-color: #fff;
+            --skin-tone: #f4c58a;
+            --hair-dark: #2a2a2a;
+            --player-blue: #2563eb;
+            --player-red: #dc2626;
+            --accent-yellow: #fbbf24;
+            --ui-bg: rgba(0,0,0,0.85);
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Noto Sans SC', sans-serif;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 900px;
+            height: 650px;
+        }
+
+        canvas {
+            border-radius: 12px;
+            box-shadow: 0 0 60px rgba(220, 38, 38, 0.3), 0 0 120px rgba(37, 99, 235, 0.2);
+        }
+
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: #fff;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            line-height: 1.6;
+            background: var(--ui-bg);
+            padding: 12px 18px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-yellow);
+        }
+
+        #ui .score {
+            font-family: 'Russo One', sans-serif;
+            font-size: 28px;
+            letter-spacing: 2px;
+        }
+
+        #ui .round {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 4px;
+        }
+
+        #instruction {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 18px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.9);
+            background: var(--ui-bg);
+            padding: 12px 28px;
+            border-radius: 25px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            border: 2px solid var(--accent-yellow);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.02); }
+        }
+
+        #powerBar {
+            position: absolute;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px;
+            height: 28px;
+            background: rgba(0,0,0,0.8);
+            border: 3px solid #fff;
+            border-radius: 14px;
+            display: none;
+            overflow: hidden;
+        }
+
+        #powerFill {
+            height: 100%;
+            width: 50%;
+            background: linear-gradient(90deg, #22c55e, #fbbf24, #ef4444);
+            border-radius: 11px;
+            transition: width 0.05s linear;
+        }
+
+        #zoneIndicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Russo One', sans-serif;
+            font-size: 48px;
+            color: var(--accent-yellow);
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            display: none;
+            pointer-events: none;
+        }
+
+        .freeze-frame {
+            animation: freeze 0.3s ease-out !important;
+        }
+
+        @keyframes freeze {
+            0%, 100% { filter: brightness(1) saturate(1); }
+            50% { filter: brightness(1.5) saturate(1.3); }
+        }
+
+        .goal-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Russo One', sans-serif;
+            font-size: 72px;
+            color: #22c55e;
+            text-shadow: 4px 4px 8px rgba(0,0,0,0.9), 0 0 40px rgba(34,197,94,0.6);
+            animation: goalPopup 0.6s ease-out forwards;
+            pointer-events: none;
+        }
+
+        .save-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Russo One', sans-serif;
+            font-size: 72px;
+            color: #ef4444;
+            text-shadow: 4px 4px 8px rgba(0,0,0,0.9), 0 0 40px rgba(239,68,68,0.6);
+            animation: goalPopup 0.6s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes goalPopup {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="game" width="900" height="650"></canvas>
+        <div id="ui">
+            <div class="round">ROUND <span id="roundNum">1</span>/5</div>
+            <div class="score"><span id="playerScore">0</span> - <span id="aiScore">0</span></div>
+            <div id="modeText">CHOOSE SIDE</div>
+        </div>
+        <div id="instruction"></div>
+        <div id="powerBar"><div id="powerFill"></div></div>
+        <div id="zoneIndicator"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const ui = document.getElementById('ui');
+        const instruction = document.getElementById('instruction');
+        const powerBar = document.getElementById('powerBar');
+        const powerFill = document.getElementById('powerFill');
+        const zoneIndicator = document.getElementById('zoneIndicator');
+
+        // UI elements
+        const roundNumEl = document.getElementById('roundNum');
+        const playerScoreEl = document.getElementById('playerScore');
+        const aiScoreEl = document.getElementById('aiScore');
+        const modeTextEl = document.getElementById('modeText');
+
+        // Game phases
+        const PHASE = {
+            TITLE: 'title',
+            COIN: 'coin',
+            KICK_SELECT: 'kick_select',
+            KICK_POWER: 'kick_power',
+            KICK_FLY: 'kick_fly',
+            KEEP: 'keep',
+            KEEP_FLY: 'keep_fly',
+            RESULT: 'result',
+            GAMEOVER: 'gameover'
+        };
+
+        // Game state
+        const gs = {
+            phase: PHASE.TITLE,
+            playerScore: 0,
+            aiScore: 0,
+            round: 1,
+            playerIsKicker: true,
+            coinResult: null,
+            selectedZone: 4,
+            power: 50,
+            powerDir: 1,
+            ball: { x: 450, y: 520, z: 0, vx: 0, vy: 0, active: false },
+            ballTargetX: 0,
+            kicker: { x: 450, y: 520, frame: 0, kicking: false, color: '' },
+            keeper: { x: 450, y: 140, jumping: false, dir: 0, color: '' },
+            animTimer: 0,
+            resultTimer: 0,
+            shakeIntensity: 0
+        };
+
+        // Goal zones (3x3 grid, top is goal)
+        const zones = [
+            { x: 300, y: 80 }, { x: 450, y: 60 }, { x: 600, y: 80 },
+            { x: 280, y: 130 }, { x: 450, y: 115 }, { x: 620, y: 130 },
+            { x: 260, y: 180 }, { x: 450, y: 165 }, { x: 640, y: 180 }
+        ];
+
+        // Perspective parameters (oblique top-down view)
+        const perspective = {
+            vanishY: 50,
+            scaleX: 1,
+            scaleY: 0.7
+        };
+
+        // Colors
+        const COLORS = {
+            blue: '#2563eb',
+            red: '#dc2626',
+            skin: '#f4c58a',
+            hair: '#2a2a2a',
+            white: '#ffffff',
+            grassDark: '#1a5c1a',
+            grassLight: '#2d8a2d'
+        };
+
+        // Draw stadium background
+        function drawStadium() {
+            // Sky/stands gradient
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, 150);
+            skyGrad.addColorStop(0, '#1a1a2e');
+            skyGrad.addColorStop(1, '#2d2d5a');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, 900, 150);
+
+            // Crowd silhouette
+            ctx.fillStyle = '#0f0f23';
+            for (let i = 0; i < 900; i += 8) {
+                const h = 20 + Math.random() * 15;
+                ctx.fillRect(i, 130 - h, 6, h);
+            }
+
+            // Field (trapezoid for perspective)
+            ctx.fillStyle = COLORS.grassDark;
+            ctx.beginPath();
+            ctx.moveTo(100, 150);   // top-left
+            ctx.lineTo(800, 150);   // top-right
+            ctx.lineTo(900, 650);   // bottom-right
+            ctx.lineTo(0, 650);     // bottom-left
+            ctx.closePath();
+            ctx.fill();
+
+            // Grass stripes
+            ctx.save();
+            ctx.clip();
+            for (let i = -5; i < 15; i++) {
+                ctx.fillStyle = i % 2 === 0 ? COLORS.grassDark : COLORS.grassLight;
+                ctx.beginPath();
+                ctx.moveTo(100 + i * 80, 150);
+                ctx.lineTo(100 + (i + 1) * 80, 150);
+                ctx.lineTo(100 + (i + 1.5) * 80, 650);
+                ctx.lineTo(100 + (i + 0.5) * 80, 650);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+
+            // Field lines (adjusted for perspective)
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.lineWidth = 3;
+
+            // Goal area (top rectangle)
+            ctx.beginPath();
+            ctx.moveTo(280, 150);
+            ctx.lineTo(620, 150);
+            ctx.lineTo(660, 230);
+            ctx.lineTo(240, 230);
+            ctx.closePath();
+            ctx.stroke();
+
+            // Goal box
+            ctx.beginPath();
+            ctx.moveTo(350, 150);
+            ctx.lineTo(550, 150);
+            ctx.lineTo(580, 280);
+            ctx.lineTo(320, 280);
+            ctx.closePath();
+            ctx.stroke();
+
+            // Penalty spot
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(450, 480, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Goal frame
+            ctx.strokeStyle = '#f0f0f0';
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.moveTo(300, 150);
+            ctx.lineTo(300, 80);
+            ctx.lineTo(600, 80);
+            ctx.lineTo(600, 150);
+            ctx.stroke();
+
+            // Net pattern
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 1;
+            for (let x = 300; x <= 600; x += 25) {
+                ctx.beginPath();
+                ctx.moveTo(x, 80);
+                ctx.lineTo(x + (x - 450) * 0.15, 150);
+                ctx.stroke();
+            }
+            for (let y = 80; y <= 150; y += 15) {
+                ctx.beginPath();
+                ctx.moveTo(300, y);
+                ctx.lineTo(600, y);
+                ctx.stroke();
+            }
+        }
+
+        // Draw a humanoid player (cartoon style)
+        function drawPlayer(x, y, color, isKicker, facingLeft, jumping, jumpDir) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            if (facingLeft) ctx.scale(-1, 1);
+            if (jumping && jumpDir !== 0) {
+                ctx.rotate(jumpDir * 0.4);
+            }
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, 35, 25, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Legs
+            const legAnim = Math.sin(gs.animTimer * 0.15) * (isKicker ? 0 : 5);
+            ctx.fillStyle = '#222';
+            ctx.fillRect(-12, 15, 10, 25 + legAnim);
+            ctx.fillRect(2, 15, 10, 25 - legAnim);
+
+            // Body (jersey)
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.ellipse(0, -5, 22, 28, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Jersey number
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('10', 0, 0);
+
+            // Arms
+            ctx.fillStyle = COLORS.skin;
+            if (jumping) {
+                // Arms up for jump
+                ctx.fillRect(-35, -25, 12, 25);
+                ctx.fillRect(23, -25, 12, 25);
+                // Gloves
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-38, -30, 18, 18);
+                ctx.fillRect(20, -30, 18, 18);
+            } else {
+                ctx.fillRect(-32, -10, 10, 20);
+                ctx.fillRect(22, -10, 10, 20);
+            }
+
+            // Head
+            ctx.fillStyle = COLORS.skin;
+            ctx.beginPath();
+            ctx.arc(0, -42, 18, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Hair
+            ctx.fillStyle = COLORS.hair;
+            ctx.beginPath();
+            ctx.arc(0, -48, 16, Math.PI, Math.PI * 2);
+            ctx.fill();
+            // Hair tuft
+            ctx.beginPath();
+            ctx.moveTo(-8, -55);
+            ctx.lineTo(5, -62);
+            ctx.lineTo(12, -50);
+            ctx.closePath();
+            ctx.fill();
+
+            // Face
+            ctx.fillStyle = '#222';
+            ctx.beginPath();
+            ctx.arc(-6, -45, 3, 0, Math.PI * 2);
+            ctx.arc(6, -45, 3, 0, Math.PI * 2);
+            ctx.fill();
+            // Determined expression
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-5, -36);
+            ctx.lineTo(5, -36);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Draw ball with shadow
+        function drawBall(x, y, z) {
+            const size = 14 + z * 0.3;
+            const shadowY = y + 35;
+
+            // Shadow (moves based on height)
+            ctx.fillStyle = `rgba(0,0,0,${0.4 - z * 0.02})`;
+            ctx.beginPath();
+            ctx.ellipse(x, shadowY, size * 0.9, size * 0.4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ball
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(x, y - z, size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ball pattern
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(x - size * 0.3, y - z - size * 0.3, size * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + size * 0.4, y - z + size * 0.2, size * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw aim zones
+        function drawZones() {
+            if (gs.phase !== PHASE.KICK_SELECT && gs.phase !== PHASE.KICK_POWER) return;
+
+            zones.forEach((z, i) => {
+                ctx.strokeStyle = gs.selectedZone === i ? '#fbbf24' : 'rgba(255,255,255,0.4)';
+                ctx.lineWidth = gs.selectedZone === i ? 4 : 2;
+                ctx.fillStyle = gs.selectedZone === i ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.1)';
+
+                ctx.beginPath();
+                ctx.arc(z.x, z.y, 30, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            // Zone number
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            zones.forEach((z, i) => {
+                ctx.fillText(i + 1, z.x, z.y + 5);
+            });
+        }
+
+        // Draw title screen
+        function drawTitle() {
+            // Dramatic gradient overlay
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, 900, 650);
+
+            // Title
+            ctx.fillStyle = '#dc2626';
+            ctx.font = 'bold 72px "Russo One", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('热血点球大战', 450, 200);
+
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = '28px "Russo One", sans-serif';
+            ctx.fillText('HYPER PENALTY SHOOTOUT', 450, 250);
+
+            // Decorative line
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(250, 280);
+            ctx.lineTo(650, 280);
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px sans-serif';
+            ctx.fillText('方向键 选择射门区域 | 空格键 蓄力射门', 450, 340);
+            ctx.fillText('← → 移动守门员 | 空格键 跳跃扑救', 450, 380);
+
+            // Start prompt
+            const blink = Math.sin(gs.animTimer * 0.1) > 0;
+            if (blink) {
+                ctx.fillStyle = '#22c55e';
+                ctx.font = 'bold 28px "Russo One", sans-serif';
+                ctx.fillText('PRESS SPACE TO START', 450, 480);
+            }
+
+            // Ball animation
+            const ballY = 550 + Math.sin(gs.animTimer * 0.08) * 10;
+            drawBall(450, ballY, 0);
+
+            ctx.textAlign = 'left';
+        }
+
+        // Draw coin toss screen
+        function drawCoin() {
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(0, 0, 900, 650);
+
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 36px "Russo One", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('猜硬币决定先后', 450, 180);
+
+            // Coin
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.arc(450, 300, 60, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#b8860b';
+            ctx.font = 'bold 48px "Russo One", sans-serif';
+            ctx.fillText(gs.coinResult === '正面' ? '○' : '●', 450, 315);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '24px sans-serif';
+            ctx.fillText('按 1 选择先踢 | 按 2 选择先守', 450, 430);
+
+            ctx.textAlign = 'left';
+        }
+
+        // Draw result flash
+        function drawResult() {
+            const text = document.createElement('div');
+            text.className = gs.kickResult === 'GOAL!' ? 'goal-text' : 'save-text';
+            text.textContent = gs.kickResult;
+            document.getElementById('gameContainer').appendChild(text);
+            setTimeout(() => text.remove(), 1500);
+        }
+
+        // Update UI
+        function updateUI() {
+            roundNumEl.textContent = gs.round;
+            playerScoreEl.textContent = gs.playerScore;
+            aiScoreEl.textContent = gs.aiScore;
+            modeTextEl.textContent = gs.playerIsKicker ? '【射门】' : '【扑救】';
+        }
+
+        // Game logic
+        function update() {
+            gs.animTimer++;
+
+            // Screen shake decay
+            if (gs.shakeIntensity > 0) {
+                gs.shakeIntensity *= 0.9;
+                if (gs.shakeIntensity < 0.5) gs.shakeIntensity = 0;
+            }
+
+            if (gs.phase === PHASE.KICK_POWER) {
+                gs.power += gs.powerDir * 2.5;
+                if (gs.power >= 100) gs.power = 100, gs.powerDir = -1;
+                if (gs.power <= 0) gs.power = 0, gs.powerDir = 1;
+                powerFill.style.width = gs.power + '%';
+                zoneIndicator.textContent = gs.power > 70 ? '⚡' : gs.power < 30 ? '・' : '';
+            }
+
+            if (gs.phase === PHASE.KICK_FLY) {
+                gs.ball.x += gs.ball.vx;
+                gs.ball.z += gs.ball.vy;
+                gs.ball.vy -= 0.35;
+                gs.kicker.frame += 0.3;
+
+                // Keeper AI moves toward predicted landing
+                const targetX = gs.ballTargetX;
+                gs.keeper.x += (targetX - gs.keeper.x) * 0.12;
+
+                if (gs.ball.z <= 0) {
+                    gs.ball.z = 0;
+                    checkKickResult();
+                }
+            }
+
+            if (gs.phase === PHASE.KEEP_FLY) {
+                gs.ball.x += gs.ball.vx;
+                gs.ball.z += gs.ball.vy;
+                gs.ball.vy -= 0.35;
+                gs.keeper.x += (gs.ballTargetX - gs.keeper.x) * 0.1;
+
+                if (gs.ball.z <= 0) {
+                    gs.ball.z = 0;
+                    checkKeepResult();
+                }
+            }
+
+            if (gs.phase === PHASE.RESULT) {
+                gs.resultTimer++;
+                if (gs.resultTimer > 100) {
+                    gs.resultTimer = 0;
+                    nextPhase();
+                }
+            }
+        }
+
+        function checkKickResult() {
+            const dist = Math.abs(gs.ball.x - gs.ballTargetX);
+            const saved = dist > 50 || Math.random() < 0.35;
+
+            if (saved) {
+                gs.kickResult = 'SAVED!';
+                gs.shakeIntensity = 8;
+            } else {
+                gs.kickResult = 'GOAL!';
+                gs.playerScore++;
+                gs.shakeIntensity = 15;
+            }
+
+            gs.phase = PHASE.RESULT;
+            drawResult();
+        }
+
+        function checkKeepResult() {
+            const dist = Math.abs(gs.ball.x - gs.keeper.x);
+            const saved = dist > 45 || Math.random() < 0.3;
+
+            if (saved) {
+                gs.kickResult = 'SAVED!';
+                gs.shakeIntensity = 10;
+            } else {
+                gs.kickResult = 'GOAL!';
+                gs.aiScore++;
+                gs.shakeIntensity = 12;
+            }
+
+            gs.phase = PHASE.RESULT;
+            drawResult();
+        }
+
+        function nextPhase() {
+            if (gs.playerIsKicker) {
+                gs.playerIsKicker = false;
+                resetPositions();
+                gs.phase = PHASE.KEEP;
+                instruction.textContent = '← → 移动守门员 | 空格 跳跃';
+                setTimeout(aiKick, 1200);
+            } else {
+                gs.round++;
+                if (gs.round > 5 && gs.playerScore === gs.aiScore) {
+                    // Sudden death continues
+                } else if (gs.round > 5) {
+                    gs.phase = PHASE.GAMEOVER;
+                    instruction.textContent = '按 空格键 重新开始';
+                    return;
+                }
+                gs.playerIsKicker = true;
+                resetPositions();
+                gs.phase = PHASE.KICK_SELECT;
+                instruction.textContent = '方向键选择区域 | 空格蓄力';
+            }
+        }
+
+        function aiKick() {
+            if (gs.phase !== PHASE.KEEP) return;
+
+            const targetIdx = Math.floor(Math.random() * 9);
+            const target = zones[targetIdx];
+
+            gs.ball = {
+                x: 450,
+                y: 520,
+                vx: (target.x - 450) / 50,
+                vy: 7 + Math.random() * 3,
+                z: 0
+            };
+            gs.ballTargetX = target.x;
+            gs.phase = PHASE.KEEP_FLY;
+            instruction.textContent = '← → 移动 | 空格 跳跃！';
+        }
+
+        function resetPositions() {
+            gs.kicker.x = 450;
+            gs.kicker.y = 520;
+            gs.kicker.frame = 0;
+            gs.kicker.kicking = false;
+            gs.keeper.x = 450;
+            gs.keeper.y = 140;
+            gs.keeper.jumping = false;
+            gs.keeper.dir = 0;
+            gs.ball = { x: 450, y: 520, z: 0, vx: 0, vy: 0, active: false };
+            gs.power = 50;
+            gs.selectedZone = 4;
+            powerBar.style.display = 'none';
+            zoneIndicator.style.display = 'none';
+        }
+
+        function kickBall() {
+            const target = zones[gs.selectedZone];
+            const power = gs.power / 100;
+
+            gs.ball = {
+                x: gs.kicker.x,
+                y: gs.kicker.y,
+                vx: (target.x - gs.kicker.x) / 45 * (0.8 + power * 0.4),
+                vy: 6 + power * 5,
+                z: 0
+            };
+            gs.ballTargetX = target.x;
+            gs.kicker.kicking = true;
+
+            // AI keeper reaction
+            const guessOffset = (Math.random() - 0.5) * 100;
+            gs.keeper.x = target.x + guessOffset;
+            if (Math.random() > 0.3) {
+                gs.keeper.jumping = true;
+                gs.keeper.dir = target.x > 450 ? 1 : -1;
+                setTimeout(() => {
+                    gs.keeper.jumping = false;
+                    gs.keeper.dir = 0;
+                }, 700);
+            }
+
+            gs.phase = PHASE.KICK_FLY;
+            powerBar.style.display = 'none';
+            zoneIndicator.style.display = 'none';
+            instruction.textContent = '';
+            gs.shakeIntensity = 10;
+        }
+
+        function render() {
+            ctx.save();
+
+            // Apply screen shake
+            if (gs.shakeIntensity > 0) {
+                ctx.translate(
+                    (Math.random() - 0.5) * gs.shakeIntensity,
+                    (Math.random() - 0.5) * gs.shakeIntensity
+                );
+            }
+
+            ctx.clearRect(0, 0, 900, 650);
+            drawStadium();
+
+            if (gs.phase === PHASE.TITLE) {
+                drawTitle();
+            } else if (gs.phase === PHASE.COIN) {
+                // Show field behind
+                const playerColor = gs.coinResult === '正面' ? COLORS.blue : COLORS.red;
+                drawPlayer(450, 520, playerColor, true, false, false, 0);
+                drawPlayer(450, 140, playerColor === COLORS.blue ? COLORS.red : COLORS.blue, false, false, false, 0);
+                drawCoin();
+            } else if (gs.phase === PHASE.KICK_SELECT || gs.phase === PHASE.KICK_POWER) {
+                drawZones();
+                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.red, false, true, gs.keeper.jumping, gs.keeper.dir);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.blue, true, false, false, 0);
+                drawBall(gs.kicker.x, gs.kicker.y, 0);
+
+                if (gs.phase === PHASE.KICK_POWER) {
+                    zoneIndicator.style.display = 'block';
+                    powerBar.style.display = 'block';
+                }
+            } else if (gs.phase === PHASE.KICK_FLY) {
+                drawZones();
+                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.red, false, true, gs.keeper.jumping, gs.keeper.dir);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.blue, true, false, gs.kicker.kicking, 0);
+                drawBall(gs.ball.x, gs.ball.y, gs.ball.z);
+            } else if (gs.phase === PHASE.KEEP) {
+                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.blue, false, true, gs.keeper.jumping, gs.keeper.dir);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.red, true, false, false, 0);
+                drawBall(gs.kicker.x, gs.kicker.y, 0);
+            } else if (gs.phase === PHASE.KEEP_FLY) {
+                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.blue, false, true, gs.keeper.jumping, gs.keeper.dir);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.red, true, false, false, 0);
+                drawBall(gs.ball.x, gs.ball.y, gs.ball.z);
+            } else if (gs.phase === PHASE.GAMEOVER) {
+                ctx.fillStyle = 'rgba(0,0,0,0.75)';
+                ctx.fillRect(0, 0, 900, 650);
+
+                ctx.textAlign = 'center';
+                if (gs.playerScore > gs.aiScore) {
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = 'bold 64px "Russo One", sans-serif';
+                    ctx.fillText('YOU WIN!', 450, 250);
+                } else {
+                    ctx.fillStyle = '#dc2626';
+                    ctx.font = 'bold 64px "Russo One", sans-serif';
+                    ctx.fillText('YOU LOSE', 450, 250);
+                }
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '48px "Russo One", sans-serif';
+                ctx.fillText(`${gs.playerScore} - ${gs.aiScore}`, 450, 330);
+
+                ctx.font = '22px sans-serif';
+                ctx.fillText('按 SPACE 重新开始', 450, 420);
+                ctx.textAlign = 'left';
+            }
+
+            updateUI();
+            ctx.restore();
+        }
+
+        // Input handling
+        document.addEventListener('keydown', e => {
+            if (e.code === 'Space') e.preventDefault();
+
+            if (gs.phase === PHASE.TITLE) {
+                if (e.code === 'Space') {
+                    gs.phase = PHASE.COIN;
+                    gs.coinResult = Math.random() > 0.5 ? '正面' : '背面';
+                }
+            } else if (gs.phase === PHASE.COIN) {
+                if (e.code === 'Digit1' || e.code === 'Numpad1') {
+                    gs.playerIsKicker = true;
+                    gs.phase = PHASE.KICK_SELECT;
+                    resetPositions();
+                    instruction.textContent = '方向键选择区域 | 空格蓄力';
+                } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+                    gs.playerIsKicker = false;
+                    gs.phase = PHASE.KEEP;
+                    resetPositions();
+                    instruction.textContent = '← → 移动守门员 | 空格 跳跃';
+                    setTimeout(aiKick, 1200);
+                }
+            } else if (gs.phase === PHASE.KICK_SELECT) {
+                if (e.code === 'ArrowLeft' && gs.selectedZone > 0) {
+                    gs.selectedZone--;
+                } else if (e.code === 'ArrowRight' && gs.selectedZone < 8) {
+                    gs.selectedZone++;
+                } else if (e.code === 'Space') {
+                    gs.phase = PHASE.KICK_POWER;
+                    powerBar.style.display = 'block';
+                    zoneIndicator.style.display = 'block';
+                }
+            } else if (gs.phase === PHASE.KICK_POWER) {
+                if (e.code === 'Space') {
+                    kickBall();
+                }
+            } else if (gs.phase === PHASE.KEEP) {
+                if (e.code === 'ArrowLeft') {
+                    gs.keeper.x = Math.max(260, gs.keeper.x - 12);
+                } else if (e.code === 'ArrowRight') {
+                    gs.keeper.x = Math.min(640, gs.keeper.x + 12);
+                } else if (e.code === 'Space' && !gs.keeper.jumping) {
+                    gs.keeper.jumping = true;
+                    gs.keeper.dir = gs.ball.x > gs.keeper.x ? 1 : -1;
+                    setTimeout(() => {
+                        gs.keeper.jumping = false;
+                        gs.keeper.dir = 0;
+                    }, 500);
+                }
+            } else if (gs.phase === PHASE.GAMEOVER) {
+                if (e.code === 'Space') {
+                    gs.phase = PHASE.TITLE;
+                    gs.playerScore = 0;
+                    gs.aiScore = 0;
+                    gs.round = 1;
+                    resetPositions();
+                }
+            }
+        });
+
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
