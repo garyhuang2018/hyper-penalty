@@ -52,6 +52,71 @@
         .corner-sign { position: absolute; font-size: 12px; color: rgba(255,255,255,0.5); }
         .corner-sign.tl { top: 185px; left: 85px; }
         .corner-sign.tr { top: 185px; right: 85px; }
+
+        /* Touch Controls */
+        #touchControls {
+            display: none;
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            padding: 10px 20px;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+        #touchControls.active { display: flex; }
+        .touch-btn {
+            pointer-events: auto;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            border: 3px solid rgba(255,255,255,0.4);
+            color: #fff;
+            font-size: 28px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .touch-btn:active {
+            background: rgba(255,255,255,0.4);
+            transform: scale(0.95);
+        }
+        .touch-btn.large {
+            width: 80px;
+            height: 80px;
+            font-size: 32px;
+            background: rgba(251,191,36,0.3);
+            border-color: #fbbf24;
+        }
+        .touch-btn-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .touch-btn-label {
+            font-size: 10px;
+            color: rgba(255,255,255,0.6);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        /* Zone selection indicators for touch */
+        #zoneIndicators {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 180px;
+            pointer-events: none;
+        }
+        #zoneIndicators.active { display: block; }
     </style>
 </head>
 <body>
@@ -66,6 +131,25 @@
         <div class="corner-sign tr">右 →</div>
         <div id="instruction"></div>
         <div id="powerBar"><div id="powerFill"></div></div>
+        <div id="zoneIndicators"></div>
+        <div id="touchControls">
+            <div class="touch-btn-group">
+                <div>
+                    <button class="touch-btn" id="btnLeft">←</button>
+                    <div class="touch-btn-label">LEFT</div>
+                </div>
+            </div>
+            <div class="touch-btn-group">
+                <button class="touch-btn large" id="btnAction">OK</button>
+                <div class="touch-btn-label">ACTION</div>
+            </div>
+            <div class="touch-btn-group">
+                <div>
+                    <button class="touch-btn" id="btnRight">→</button>
+                    <div class="touch-btn-label">RIGHT</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -88,8 +172,9 @@
         const gs = {
             phase: PHASE.TITLE, playerScore: 0, aiScore: 0, round: 1, playerIsKicker: true,
             coinResult: null, selectedZone: 4, power: 50, powerDir: 1,
-            ball: { x: 450, y: 520, z: 0, vx: 0, vy: 0 },
+            ball: { x: 450, y: 520, z: 0, vx: 0, vy: 0, vyWorld: 0 },
             ballTargetX: 0, ballEndX: 0,
+            ballTrail: [],
             kicker: { x: 450, y: 520, frame: 0, kicking: false },
             keeper: { x: 450, y: 140, jumping: false, diving: false, diveX: 0, diveDir: 0 },
             animTimer: 0, resultTimer: 0, shakeIntensity: 0, kickResult: null
@@ -102,6 +187,13 @@
         ];
 
         const COLORS = { blue: '#2563eb', red: '#dc2626', skin: '#f4c58a', hair: '#2a2a2a' };
+        const TEAM_COLORS = { blue: '#2563eb', red: '#dc2626' };
+        const HAIR_COLORS = {
+            blue: '#1e3a5f',
+            red: '#8b4513',
+            keeperBlue: '#fbbf24',
+            keeperRed: '#22c55e'
+        };
 
         function drawStadium() {
             const skyGrad = ctx.createLinearGradient(0, 0, 0, 180);
@@ -161,7 +253,7 @@
             }
         }
 
-        function drawPlayer(x, y, color, isKicker, facingLeft, jumping, diving, diveDir, diveProgress) {
+        function drawPlayer(x, y, color, isKicker, facingLeft, jumping, diving, diveDir, diveProgress, isKeeper) {
             ctx.save();
             ctx.translate(x, y);
 
@@ -171,20 +263,33 @@
             let armExtend = 0;
             let bodyY = 0;
 
-            if (diving && diveDir !== 0) {
+            // Diving/jumping animation
+            if (diving && diveProgress > 0) {
                 bodyRot = diveDir * 0.7 * diveProgress;
                 armExtend = diveProgress;
-                bodyY = -10 * diveProgress;
+                bodyY = -15 * diveProgress;
             } else if (jumping) {
                 bodyRot = diveDir * 0.2;
                 armExtend = 0.8;
                 bodyY = -15;
             }
 
+            // Shadow - drawn at ground level (y=35), scales with height during jump/dive
+            const heightFactor = Math.abs(bodyY);
+            const shadowAlpha = heightFactor > 0 ? 0.3 * (1 - heightFactor / 50) : 0.3;
+            const shadowScale = heightFactor > 0 ? 1 - heightFactor / 100 : 1;
+            ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+            ctx.beginPath();
+            ctx.ellipse(0, 35, 22 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.rotate(bodyRot);
             ctx.translate(0, bodyY);
 
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            const teamKey = color === COLORS.blue ? 'blue' : 'red';
+            const hairColor = (isKeeper && isKicker === false) ? HAIR_COLORS[`keeper${teamKey.charAt(0).toUpperCase() + teamKey.slice(1)}`] : HAIR_COLORS[teamKey];
+
+            ctx.fillStyle = '#222';
             ctx.beginPath(); ctx.ellipse(0, 35, 22, 8, 0, 0, Math.PI * 2); ctx.fill();
 
             const legAnim = Math.sin(gs.animTimer * 0.15) * (isKicker && !jumping ? 0 : 6);
@@ -198,8 +303,20 @@
             ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
             ctx.fillText('10', 0, -1);
 
+            // Arms - different pose when diving
             ctx.fillStyle = COLORS.skin;
-            if (armExtend > 0.5) {
+            if (diving && diveProgress > 0.3) {
+                // Diving save pose - arms extended forward and up
+                const armRaise = (diveProgress - 0.3) / 0.7; // 0 to 1 as dive progresses
+                const armY = -20 - armRaise * 20;
+                const armSpread = 15 + armRaise * 25;
+                ctx.fillRect(-armSpread - 5, armY, 10, 20);
+                ctx.fillRect(armSpread - 5, armY, 10, 20);
+                // Gloves
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-armSpread - 8, armY - 10, 16, 16);
+                ctx.fillRect(armSpread - 8, armY - 10, 16, 16);
+            } else if (armExtend > 0.5) {
                 ctx.fillRect(-38, -20, 10, 22);
                 ctx.fillRect(28, -20, 10, 22);
                 ctx.fillStyle = '#fff';
@@ -210,27 +327,94 @@
                 ctx.fillRect(21, -8, 9, 18);
             }
 
+            // Head
             ctx.fillStyle = COLORS.skin;
             ctx.beginPath(); ctx.arc(0, -40, 16, 0, Math.PI * 2); ctx.fill();
 
-            ctx.fillStyle = COLORS.hair;
-            ctx.beginPath(); ctx.arc(0, -46, 14, Math.PI, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.moveTo(-6, -52); ctx.lineTo(4, -58); ctx.lineTo(10, -48); ctx.closePath(); ctx.fill();
+            // Hair - keeper has distinct spiky hair
+            ctx.fillStyle = hairColor;
+            if (isKeeper) {
+                // Spiky keeper hair
+                ctx.beginPath();
+                ctx.arc(0, -46, 14, Math.PI, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(-12, -50); ctx.lineTo(-6, -62); ctx.lineTo(0, -52); ctx.closePath(); ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(-2, -52); ctx.lineTo(4, -64); ctx.lineTo(8, -52); ctx.closePath(); ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(6, -50); ctx.lineTo(12, -60); ctx.lineTo(14, -48); ctx.closePath(); ctx.fill();
+            } else {
+                // Regular player hair
+                ctx.beginPath(); ctx.arc(0, -46, 14, Math.PI, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(-6, -52); ctx.lineTo(4, -58); ctx.lineTo(10, -48); ctx.closePath(); ctx.fill();
+            }
 
+            // Eyes - 3px dark pixels
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(-7, -44, 3, 3);
+            ctx.fillRect(4, -44, 3, 3);
+
+            // Eye shine
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-6, -44, 1, 1);
+            ctx.fillRect(5, -44, 1, 1);
+
+            // Mouth / Expression based on state
             ctx.fillStyle = '#222';
-            ctx.beginPath(); ctx.arc(-5, -43, 2.5, 0, Math.PI * 2); ctx.arc(5, -43, 2.5, 0, Math.PI * 2); ctx.fill();
-
-            ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(-4, -34); ctx.lineTo(4, -34); ctx.stroke();
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 2;
+            if (diving && diveProgress > 0) {
+                // Surprised open mouth when diving
+                ctx.beginPath();
+                ctx.arc(0, -30, 4 + diveProgress * 2, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (isKicker && (gs.phase === PHASE.KICK_FLY || gs.phase === PHASE.KICK_POWER)) {
+                // Focused/powering mouth when kicking
+                ctx.fillRect(-3, -31, 6, 2);
+            } else if (gs.kickResult === 'GOAL!' && !isKicker) {
+                // Happy smile after goal
+                ctx.beginPath();
+                ctx.arc(0, -32, 5, 0, Math.PI);
+                ctx.stroke();
+            } else if (gs.kickResult === 'SAVED!' && !isKicker) {
+                // Sad frown after save
+                ctx.beginPath();
+                ctx.arc(0, -28, 4, Math.PI, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                // Normal happy mouth
+                ctx.beginPath();
+                ctx.arc(0, -33, 4, 0.1 * Math.PI, 0.9 * Math.PI);
+                ctx.stroke();
+            }
 
             ctx.restore();
         }
 
-        function drawBall(x, y, z) {
+        function drawBall(x, y, z, prevPositions) {
             if (z === undefined) z = 0;
-            const size = 14 + z * 0.3;
+            // Perspective: ball gets larger as it approaches goal (y decreases from 520 to 90)
+            const yPerspective = 1 - (y - 90) / (520 - 90); // 0 at start, 1 at goal
+            const size = (14 + z * 0.3) * (0.6 + yPerspective * 0.6);
+
+            // Draw trail (previous positions)
+            if (prevPositions && prevPositions.length > 0) {
+                for (let i = 0; i < prevPositions.length; i++) {
+                    const tp = prevPositions[i];
+                    const tpPerspective = 1 - (tp.y - 90) / (520 - 90);
+                    const trailSize = size * (0.5 + i * 0.15);
+                    const trailAlpha = 0.15 - i * 0.04;
+                    ctx.fillStyle = `rgba(255,255,255,${trailAlpha})`;
+                    ctx.beginPath();
+                    ctx.arc(tp.x, tp.y - tp.z * tpPerspective, trailSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Shadow - perspective adjusted (closer to goal = closer to player)
+            const shadowY = y + 32 * (1 - yPerspective * 0.7);
             ctx.fillStyle = `rgba(0,0,0,${0.35 - z * 0.015})`;
-            ctx.beginPath(); ctx.ellipse(x, y + 32, size * 0.85, size * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x, shadowY, size * 0.85, size * 0.35, 0, 0, Math.PI * 2); ctx.fill();
 
             ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.arc(x, y - z, size, 0, Math.PI * 2); ctx.fill();
@@ -315,35 +499,51 @@
             }
 
             if (gs.phase === PHASE.KICK_FLY) {
+                // Add current ball position to trail
+                gs.ballTrail.push({ x: gs.ball.x, y: gs.ball.y, z: gs.ball.z });
+                if (gs.ballTrail.length > 5) gs.ballTrail.shift();
+
                 gs.ball.x += gs.ball.vx;
                 gs.ball.z += gs.ball.vy;
                 gs.ball.vy -= 0.35;
+                // World-space Y movement (ball flying from kicker toward goal zone)
+                gs.ball.y += gs.ball.vyWorld;
                 gs.kicker.frame += 0.25;
 
-                if (!gs.keeper.diving && gs.keeper.jumping) {
+                if (gs.keeper.diving) {
                     gs.keeper.diveX += (gs.ballTargetX - gs.keeper.diveX) * 0.15;
-                    gs.keeper.diveProgress = Math.min(1, (gs.keeper.diveProgress || 0) + 0.08);
+                    gs.keeper.diveProgress = Math.min(1, gs.keeper.diveProgress + 0.08);
                 }
 
-                if (gs.ball.z <= 0) {
+                // End when ball reaches goal area (y around 85-190 in goal)
+                if (gs.ball.z <= 0 && gs.ball.y <= 90) {
                     gs.ball.z = 0;
+                    gs.ball.y = 90;
                     checkKickResult();
                 }
             }
 
             if (gs.phase === PHASE.KEEP_FLY) {
+                // Add current ball position to trail
+                gs.ballTrail.push({ x: gs.ball.x, y: gs.ball.y, z: gs.ball.z });
+                if (gs.ballTrail.length > 5) gs.ballTrail.shift();
+
                 gs.ball.x += gs.ball.vx;
                 gs.ball.z += gs.ball.vy;
                 gs.ball.vy -= 0.35;
+                // World-space Y movement (ball flying from kicker toward goal zone)
+                gs.ball.y += gs.ball.vyWorld;
                 gs.kicker.frame += 0.25;
 
-                if (!gs.keeper.diving && gs.keeper.jumping) {
+                if (gs.keeper.diving) {
                     gs.keeper.diveX += (gs.ballTargetX - gs.keeper.diveX) * 0.12;
-                    gs.keeper.diveProgress = Math.min(1, (gs.keeper.diveProgress || 0) + 0.07);
+                    gs.keeper.diveProgress = Math.min(1, gs.keeper.diveProgress + 0.07);
                 }
 
-                if (gs.ball.z <= 0) {
+                // End when ball reaches goal area (y around 85-190 in goal)
+                if (gs.ball.z <= 0 && gs.ball.y <= 90) {
                     gs.ball.z = 0;
+                    gs.ball.y = 90;
                     checkKeepResult();
                 }
             }
@@ -403,7 +603,10 @@
             if (gs.phase !== PHASE.KEEP) return;
             const targetIdx = Math.floor(Math.random() * 9);
             const target = zones[targetIdx];
-            gs.ball = { x: 450, y: 520, vx: (target.x - 450) / 48, vy: 7 + Math.random() * 3, z: 0 };
+            // Ball flies from kicker (y=520) toward target zone in goal (y=85-190)
+            const distY = target.y - 520;
+            gs.ball = { x: 450, y: 520, vx: (target.x - 450) / 48, vy: 7 + Math.random() * 3, z: 0,
+                vyWorld: distY / 48 };
             gs.ballTargetX = target.x;
             gs.ballEndX = target.x;
             gs.phase = PHASE.KEEP_FLY;
@@ -414,7 +617,8 @@
             gs.kicker.x = 450; gs.kicker.y = 520; gs.kicker.frame = 0; gs.kicker.kicking = false;
             gs.keeper.x = 450; gs.keeper.y = 140; gs.keeper.jumping = false;
             gs.keeper.diving = false; gs.keeper.diveX = 450; gs.keeper.diveDir = 0; gs.keeper.diveProgress = 0;
-            gs.ball = { x: 450, y: 520, z: 0, vx: 0, vy: 0 };
+            gs.ball = { x: 450, y: 520, z: 0, vx: 0, vy: 0, vyWorld: 0 };
+            gs.ballTrail = [];
             gs.power = 50; gs.selectedZone = 4;
             powerBar.style.display = 'none';
         }
@@ -422,19 +626,30 @@
         function kickBall() {
             const target = zones[gs.selectedZone];
             const power = gs.power / 100;
+            // Ball flies from kicker (y=520) toward target zone in goal (y=85-190)
+            const distY = target.y - gs.kicker.y;
             gs.ball = {
                 x: gs.kicker.x, y: gs.kicker.y,
                 vx: (target.x - gs.kicker.x) / 42 * (0.8 + power * 0.5),
-                vy: 5.5 + power * 5, z: 0
+                vy: 5.5 + power * 5, z: 0,
+                vyWorld: distY / 48
             };
             gs.ballTargetX = target.x;
             gs.ballEndX = target.x;
             gs.kicker.kicking = true;
 
+            // Keeper starts dive animation
             gs.keeper.jumping = true;
             gs.keeper.diving = true;
             gs.keeper.diveX = 450;
-            gs.keeper.diveDir = target.x > 450 ? 1 : -1;
+            // Dive direction based on target position relative to center
+            if (target.x < 360) {
+                gs.keeper.diveDir = -1; // Dive left
+            } else if (target.x > 540) {
+                gs.keeper.diveDir = 1; // Dive right
+            } else {
+                gs.keeper.diveDir = 0; // Stay center
+            }
             gs.keeper.diveProgress = 0;
 
             gs.phase = PHASE.KICK_FLY;
@@ -454,39 +669,41 @@
 
             if (gs.phase === PHASE.TITLE) { drawTitle(); }
             else if (gs.phase === PHASE.COIN) {
-                drawPlayer(450, 520, COLORS.blue, true, false, false, false, 0, 0);
-                drawPlayer(450, 140, COLORS.red, false, true, false, false, 0, 0);
+                drawPlayer(450, 520, COLORS.blue, true, false, false, false, 0, 0, false);
+                drawPlayer(450, 140, COLORS.red, false, true, false, false, 0, 0, true);
                 drawCoin();
             }
             else if (gs.phase === PHASE.KICK_SELECT || gs.phase === PHASE.KICK_POWER) {
                 drawZones();
-                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.red, false, true, false, false, 0, 0);
-                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.blue, true, false, false, false, 0, 0);
+                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.red, false, true, false, false, 0, 0, true);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.blue, true, false, false, false, 0, 0, false);
                 drawBall(gs.kicker.x, gs.kicker.y, 0);
             }
             else if (gs.phase === PHASE.KICK_FLY) {
                 drawZones();
                 const kd = gs.keeper.diving ? gs.keeper.diveX : gs.keeper.x;
                 const kp = gs.keeper.diving ? gs.keeper.diveProgress : 0;
-                drawPlayer(kd, gs.keeper.y, COLORS.red, false, true, false, gs.keeper.diving, gs.keeper.diveDir, kp);
-                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.blue, true, false, gs.kicker.kicking, false, 0, 0);
-                drawBall(gs.ball.x, gs.ball.y, gs.ball.z);
+                const kj = gs.keeper.diving ? true : false;
+                drawPlayer(kd, gs.keeper.y, COLORS.red, false, true, kj, gs.keeper.diving, gs.keeper.diveDir, kp, true);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.blue, true, false, gs.kicker.kicking, false, 0, 0, false);
+                drawBall(gs.ball.x, gs.ball.y, gs.ball.z, gs.ballTrail);
             }
             else if (gs.phase === PHASE.KEEP) {
-                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.blue, false, true, false, false, 0, 0);
-                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.red, true, false, false, false, 0, 0);
+                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.blue, false, true, false, false, 0, 0, true);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.red, true, false, false, false, 0, 0, false);
                 drawBall(gs.kicker.x, gs.kicker.y, 0);
             }
             else if (gs.phase === PHASE.KEEP_FLY) {
                 const kd = gs.keeper.diving ? gs.keeper.diveX : gs.keeper.x;
                 const kp = gs.keeper.diving ? gs.keeper.diveProgress : 0;
-                drawPlayer(kd, gs.keeper.y, COLORS.blue, false, true, false, gs.keeper.diving, gs.keeper.diveDir, kp);
-                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.red, true, false, false, false, 0, 0);
-                drawBall(gs.ball.x, gs.ball.y, gs.ball.z);
+                const kj = gs.keeper.diving ? true : false;
+                drawPlayer(kd, gs.keeper.y, COLORS.blue, false, true, kj, gs.keeper.diving, gs.keeper.diveDir, kp, true);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.red, true, false, false, false, 0, 0, false);
+                drawBall(gs.ball.x, gs.ball.y, gs.ball.z, gs.ballTrail);
             }
             else if (gs.phase === PHASE.RESULT) {
-                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.red, false, true, false, false, 0, 0);
-                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.blue, true, false, false, false, 0, 0);
+                drawPlayer(gs.keeper.x, gs.keeper.y, COLORS.red, false, true, false, false, 0, 0, true);
+                drawPlayer(gs.kicker.x, gs.kicker.y, COLORS.blue, true, false, false, false, 0, 0, false);
                 drawBall(gs.ball.x, gs.ball.y, 0);
             }
             else if (gs.phase === PHASE.GAMEOVER) {
@@ -543,7 +760,105 @@
             }
         });
 
-        function gameLoop() { update(); render(); requestAnimationFrame(gameLoop); }
+        // Touch Controls
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+        const touchControls = document.getElementById('touchControls');
+        const btnLeft = document.getElementById('btnLeft');
+        const btnRight = document.getElementById('btnRight');
+        const btnAction = document.getElementById('btnAction');
+
+        function updateTouchControls() {
+            if (!isMobile) return;
+            const show = [PHASE.TITLE, PHASE.COIN, PHASE.KICK_SELECT, PHASE.KICK_POWER, PHASE.KEEP, PHASE.GAMEOVER].includes(gs.phase);
+            touchControls.classList.toggle('active', show);
+
+            if (gs.phase === PHASE.TITLE) {
+                btnAction.textContent = 'START';
+                btnLeft.textContent = '';
+                btnRight.textContent = '';
+            } else if (gs.phase === PHASE.COIN) {
+                btnAction.textContent = '先踢';
+                btnLeft.textContent = '1';
+                btnRight.textContent = '2';
+            } else if (gs.phase === PHASE.KICK_SELECT || gs.phase === PHASE.KICK_POWER) {
+                btnAction.textContent = gs.phase === PHASE.KICK_POWER ? '射门' : '蓄力';
+                btnLeft.textContent = '←';
+                btnRight.textContent = '→';
+            } else if (gs.phase === PHASE.KEEP) {
+                btnAction.textContent = '跳';
+                btnLeft.textContent = '←';
+                btnRight.textContent = '→';
+            } else if (gs.phase === PHASE.GAMEOVER) {
+                btnAction.textContent = '重玩';
+                btnLeft.textContent = '';
+                btnRight.textContent = '';
+            } else {
+                btnLeft.textContent = '←';
+                btnRight.textContent = '→';
+            }
+        }
+
+        if (isMobile) {
+            touchControls.classList.add('active');
+            document.getElementById('zoneIndicators').classList.add('active');
+        }
+
+        btnAction.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gs.phase === PHASE.TITLE) {
+                gs.phase = PHASE.COIN; gs.coinResult = Math.random() > 0.5 ? '正面' : '背面';
+            } else if (gs.phase === PHASE.COIN) {
+                gs.playerIsKicker = true; gs.phase = PHASE.KICK_SELECT; resetPositions();
+                instruction.textContent = '方向键选择区域 | 空格蓄力';
+            } else if (gs.phase === PHASE.KICK_SELECT) {
+                gs.phase = PHASE.KICK_POWER; powerBar.style.display = 'block';
+            } else if (gs.phase === PHASE.KICK_POWER) {
+                kickBall();
+            } else if (gs.phase === PHASE.KEEP) {
+                if (!gs.keeper.jumping) {
+                    gs.keeper.jumping = true; gs.keeper.diving = true;
+                    gs.keeper.diveX = gs.keeper.x; gs.keeper.diveDir = 0; gs.keeper.diveProgress = 0;
+                }
+            } else if (gs.phase === PHASE.GAMEOVER) {
+                gs.phase = PHASE.TITLE; gs.playerScore = 0; gs.aiScore = 0; gs.round = 1;
+                resetPositions(); instruction.textContent = '';
+            }
+            updateTouchControls();
+        });
+
+        btnLeft.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gs.phase === PHASE.COIN) {
+                gs.playerIsKicker = true; gs.phase = PHASE.KICK_SELECT; resetPositions();
+                instruction.textContent = '方向键选择区域 | 空格蓄力';
+            } else if (gs.phase === PHASE.KICK_SELECT) {
+                if (gs.selectedZone > 0) gs.selectedZone--;
+            } else if (gs.phase === PHASE.KEEP) {
+                gs.keeper.x = Math.max(270, gs.keeper.x - 12);
+            }
+            updateTouchControls();
+        });
+
+        btnRight.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gs.phase === PHASE.COIN) {
+                gs.playerIsKicker = false; gs.phase = PHASE.KEEP; resetPositions();
+                instruction.textContent = '← → 移动守门员 | 空格 跳跃';
+                setTimeout(aiKick, 1100);
+            } else if (gs.phase === PHASE.KICK_SELECT) {
+                if (gs.selectedZone < 8) gs.selectedZone++;
+            } else if (gs.phase === PHASE.KEEP) {
+                gs.keeper.x = Math.min(630, gs.keeper.x + 12);
+            }
+            updateTouchControls();
+        });
+
+        // Also update on coin choice buttons
+        document.addEventListener('keydown', e => {
+            updateTouchControls();
+        });
+
+        function gameLoop() { update(); render(); updateTouchControls(); requestAnimationFrame(gameLoop); }
         gameLoop();
     </script>
 </body>
