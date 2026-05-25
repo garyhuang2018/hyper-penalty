@@ -43,6 +43,8 @@ export const GAME_CONFIG = {
     RADIUS: 8,
     FRICTION: 0.98,
     COLOR: '#ffffff',
+    SPRITE_SIZE: 16,
+    FLAME_COLOR: '#ff6600',
   },
 
   // 比赛设置

@@ -13,6 +13,50 @@ import { MatchController } from '../systems/MatchController.js';
 import { SkillSystem } from '../systems/SkillSystem.js';
 import { eventBus } from '../core/EventBus.js';
 
+// 球精灵图生成器
+class BallSpriteGenerator {
+  static getNormalBall(frame) {
+    // 普通球 - 有轻微旋转动画（每4帧转一点）
+    const rotationOffset = (frame % 4) * 2;
+
+    return {
+      pixels: [
+        // 球体主体
+        { x: 0, y: 0, r: 7, c: '#ffffff' },
+        // 黑色五边形图案（模拟足球）
+        { x: -2, y: -3, w: 4, h: 4, c: '#333333' },
+      ],
+      rotation: rotationOffset
+    };
+  }
+
+  static getFlameBall(frame) {
+    // 火焰球 - 旋转的火焰效果
+    const flamePhase = frame % 8;
+    const scale = 1 + (flamePhase < 4 ? flamePhase * 0.1 : (8 - flamePhase) * 0.1);
+
+    // 火焰粒子位置（围绕球的火焰效果）
+    const flameParticles = [];
+    const numFlames = 6;
+    for (let i = 0; i < numFlames; i++) {
+      const angle = (i / numFlames) * Math.PI * 2 + (flamePhase * 0.3);
+      const dist = 8 + Math.sin(flamePhase * 0.5 + i) * 2;
+      flameParticles.push({
+        x: Math.cos(angle) * dist * scale,
+        y: Math.sin(angle) * dist * scale,
+        size: 3 + Math.sin(flamePhase + i) * 1.5,
+        c: i % 2 === 0 ? '#ff6600' : '#ffcc00'
+      });
+    }
+
+    return {
+      center: { x: 0, y: 0, r: 6, c: '#ffffff' },
+      flames: flameParticles,
+      glow: { r: 12, c: 'rgba(255, 100, 0, 0.4)' }
+    };
+  }
+}
+
 // 简单像素精灵图生成器
 class SpriteGenerator {
   // 生成球员精灵图数据
@@ -266,6 +310,7 @@ export class MatchScene {
 
       // 更新球
       this.ball.update();
+      this.ball.updateAnimation();
 
       // AI 决策
       this.ai.update(deltaTime);
@@ -361,29 +406,64 @@ export class MatchScene {
 
   _renderBall() {
     const ctx = this.renderer.ctx;
+    const frame = this.ball.animFrame; // 使用球的动画帧
 
-    // 火焰效果
+    // 普通球或火焰球
     if (this.ball.isFlame) {
-      ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
+      const flameBall = BallSpriteGenerator.getFlameBall(frame);
+
+      // 发光效果
+      const gradient = ctx.createRadialGradient(
+        this.ball.x, this.ball.y, 0,
+        this.ball.x, this.ball.y, flameBall.glow.r
+      );
+      gradient.addColorStop(0, 'rgba(255, 150, 0, 0.6)');
+      gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(this.ball.x, this.ball.y, this.ball.radius + 6, 0, Math.PI * 2);
+      ctx.arc(this.ball.x, this.ball.y, flameBall.glow.r, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = 'rgba(255, 200, 0, 0.7)';
+      // 火焰粒子
+      flameBall.flames.forEach(f => {
+        ctx.fillStyle = f.c;
+        ctx.beginPath();
+        ctx.arc(this.ball.x + f.x, this.ball.y + f.y, f.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 球核心
+      ctx.fillStyle = flameBall.center.c;
       ctx.beginPath();
-      ctx.arc(this.ball.x, this.ball.y, this.ball.radius + 3, 0, Math.PI * 2);
+      ctx.arc(this.ball.x, this.ball.y, flameBall.center.r, 0, Math.PI * 2);
       ctx.fill();
+    } else {
+      const normalBall = BallSpriteGenerator.getNormalBall(frame);
+
+      // 球本体
+      ctx.fillStyle = normalBall.pixels[0].c;
+      ctx.beginPath();
+      ctx.arc(this.ball.x, this.ball.y, normalBall.pixels[0].r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 黑色五边形图案
+      ctx.fillStyle = normalBall.pixels[1].c;
+      ctx.beginPath();
+      const patternX = this.ball.x - normalBall.pixels[1].w / 2 + normalBall.pixels[1].x + normalBall.pixels[1].w / 2;
+      const patternY = this.ball.y - normalBall.pixels[1].h / 2 + normalBall.pixels[1].y + normalBall.pixels[1].h / 2;
+      ctx.moveTo(patternX, patternY - 2);
+      ctx.lineTo(patternX + 2, patternY + 1);
+      ctx.lineTo(patternX - 2, patternY + 1);
+      ctx.closePath();
+      ctx.fill();
+
+      // 球边框
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(this.ball.x, this.ball.y, GAME_CONFIG.BALL.RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
     }
-
-    // 球本体
-    ctx.fillStyle = GAME_CONFIG.BALL.COLOR;
-    ctx.beginPath();
-    ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    ctx.stroke();
   }
 
   _renderUI() {

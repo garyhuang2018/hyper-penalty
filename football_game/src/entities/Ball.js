@@ -12,6 +12,8 @@ export class Ball {
     this.isHeld = false;      // 是否被球员持有
     this.isFlame = false;     // 是否是火焰球
     this.holder = null;       // 持有者的引用
+    this.animFrame = 0;       // 动画帧
+    this.animTimer = 0;        // 动画计时器
   }
 
   // 更新球的位置
@@ -100,5 +102,14 @@ export class Ball {
   // 是否静止
   isMoving() {
     return Math.abs(this.vx) > 0.5 || Math.abs(this.vy) > 0.5;
+  }
+
+  // 更新动画帧
+  updateAnimation() {
+    this.animTimer++;
+    if (this.animTimer > 6) {
+      this.animTimer = 0;
+      this.animFrame = (this.animFrame + 1) % 8;
+    }
   }
 }
