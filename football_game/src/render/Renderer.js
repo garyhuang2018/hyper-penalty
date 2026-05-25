@@ -143,6 +143,12 @@ export class Renderer {
     }
     ctx.fillRect(field.OFFSET_X, field.OFFSET_Y, field.WIDTH, field.HEIGHT);
 
+    // === 场地线条3D效果：阴影层 ===
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+
     // 场地边线
     ctx.strokeStyle = field.LINE_COLOR;
     ctx.lineWidth = field.LINE_WIDTH;
@@ -200,6 +206,12 @@ export class Renderer {
       goalAreaWidth,
       goalAreaHeight
     );
+
+    // 重置阴影
+    ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
   }
 
   // 绘制球门 - 3D立体效果
