@@ -161,12 +161,12 @@ export class AIController {
         break;
 
       case 'support':
-        // 支援 - 在持球者身后（朝向己方球门方向 = 防守方向）
-        // 注意：蓝队(B)进攻方向是朝左(对方球门)，所以"身后"是x+40（朝己方球门）
+        // 支援 - 在持球者身前（进攻方向，准备接球）
+        // 蓝队(B)进攻方向是朝左，队友持球时跑到前方(-40)准备接球
         if (ball.holder && ball.holder.team === 'B') {
           const holder = ball.holder;
-          // 在持球者身后（防守方向）
-          targetX = holder.x + 40; // +40 is toward own goal for Blue
+          // 在持球者前方（进攻方向）
+          targetX = holder.x - 40;
           targetY = holder.y;
           // 中场支援时可以稍微靠边
           if (role === 'midfielder') {
