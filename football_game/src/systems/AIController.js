@@ -1,0 +1,183 @@
+// AI 控制器
+import { GAME_CONFIG } from '../config/game.config.js';
+import { eventBus } from '../core/EventBus.js';
+
+export class AIController {
+  constructor(scene) {
+    this.scene = scene;
+    this.players = scene.players;
+    this.ball = scene.ball;
+    this.field = scene.field;
+
+    // AI 思维间隔
+    this.thinkTimer = 0;
+    this.thinkInterval = GAME_CONFIG.AI.THINK_INTERVAL;
+
+    // AI 状态
+    this.aiStates = new Map();
+
+    // 初始化 AI 状态
+    this.players.filter(p => p.team === 'B').forEach(player => {
+      this.aiStates.set(player, 'chase_ball');
+    });
+
+    // 监听射门事件
+    eventBus.on('playerShoot', () => this._onAIShoot());
+  }
+
+  update(deltaTime) {
+    // 获取蓝队 AI 球员
+    const aiPlayers = this.players.filter(p => p.team === 'B');
+
+    this.thinkTimer += deltaTime;
+
+    if (this.thinkTimer >= this.thinkInterval) {
+      this.thinkTimer = 0;
+
+      aiPlayers.forEach(player => {
+        this._think(player);
+      });
+    }
+
+    // 每个帧更新移动
+    aiPlayers.forEach(player => {
+      this._act(player);
+    });
+  }
+
+  _think(player) {
+    const ball = this.ball;
+    const role = player.role;
+    const state = this.aiStates.get(player);
+
+    // 判断距离球门的方向
+    const goalToDefend = this.field.getGoalPosition('B'); // 蓝队球门
+    const goalToAttack = this.field.getGoalPosition('A'); // 红队球门
+
+    if (role === 'goalkeeper') {
+      // 守门员：坚守球门
+      if (ball.isHeld && ball.holder.team === 'A' && ball.distanceTo(goalToDefend) < 200) {
+        this.aiStates.set(player, 'defend_goal');
+      } else {
+        this.aiStates.set(player, 'guard_goal');
+      }
+    } else if (role === 'defender') {
+      // 后卫：主要防守，追球解围
+      if (ball.isHeld && ball.holder.team === 'A') {
+        this.aiStates.set(player, 'chase_ball');
+      } else {
+        this.aiStates.set(player, 'support');
+      }
+    } else {
+      // 前锋：进攻为主
+      if (ball.isHeld) {
+        if (ball.holder.team === 'B') {
+          // 队友带球，支援
+          this.aiStates.set(player, 'support');
+        } else {
+          // 对方带球，追球
+          this.aiStates.set(player, 'chase_ball');
+        }
+      } else {
+        // 球自由，追球
+        this.aiStates.set(player, 'chase_ball');
+      }
+    }
+  }
+
+  _act(player) {
+    const ball = this.ball;
+    const state = this.aiStates.get(player);
+    const goalToAttack = this.field.getGoalPosition('A');
+
+    let targetX, targetY;
+    let speed = GAME_CONFIG.AI.CHASE_SPEED;
+
+    switch (state) {
+      case 'guard_goal':
+        // 守门员在球门前小范围移动
+        const goalPos = this.field.getGoalPosition('B');
+        targetX = goalPos.x + 40;
+        targetY = ball.y;
+        targetY = Math.max(goalPos.y - 60, Math.min(goalPos.y + 60, targetY));
+        break;
+
+      case 'defend_goal':
+        // 冲向球
+        targetX = ball.x;
+        targetY = ball.y;
+        speed = GAME_CONFIG.AI.ATTACK_SPEED;
+        break;
+
+      case 'chase_ball':
+        // 追球
+        if (ball.isHeld && ball.holder.team === 'B') {
+          // 队友带球，去支援
+          const holder = ball.holder;
+          targetX = holder.x - 30;
+          targetY = holder.y;
+        } else {
+          targetX = ball.x;
+          targetY = ball.y;
+        }
+        break;
+
+      case 'attack':
+        // 带球进攻
+        targetX = goalToAttack.x;
+        targetY = goalToAttack.y;
+        speed = GAME_CONFIG.AI.ATTACK_SPEED;
+        break;
+
+      case 'support':
+        // 支援
+        if (ball.holder && ball.holder.team === 'B') {
+          const holder = ball.holder;
+          // 在持球者前方跑位
+          const angle = holder.direction;
+          targetX = holder.x - Math.cos(angle) * 40;
+          targetY = holder.y - Math.sin(angle) * 40;
+        } else {
+          targetX = ball.x;
+          targetY = ball.y;
+        }
+        break;
+
+      default:
+        targetX = ball.x;
+        targetY = ball.y;
+    }
+
+    // 移动向目标
+    const dx = targetX - player.x;
+    const dy = targetY - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > 5) {
+      const moveX = dx / dist;
+      const moveY = dy / dist;
+      player.move(moveX, moveY);
+    }
+
+    // 尝试射门
+    if (player.role === 'forward' && ball.isHeld && ball.holder === player) {
+      const goalPos = this.field.getGoalPosition('A');
+      const distToGoal = Math.sqrt(
+        Math.pow(goalPos.x - player.x, 2) +
+        Math.pow(goalPos.y - player.y, 2)
+      );
+
+      // 距球门一定范围内射门
+      if (distToGoal < 200 && Math.random() < 0.03) {
+        const shootResult = player.shoot(12, false);
+        if (shootResult) {
+          ball.shoot(shootResult.power, shootResult.angle, shootResult.isFlame);
+        }
+      }
+    }
+  }
+
+  _onAIShoot() {
+    // AI 射门后的处理
+  }
+}
