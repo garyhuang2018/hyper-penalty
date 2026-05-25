@@ -100,9 +100,11 @@ export class Player {
     this.state = 'shooting';
 
     // 射门方向朝向对方球门
+    // Team A (红) 在左侧，进攻方向是 RIGHT (x=900)
+    // Team B (蓝) 在右侧，进攻方向是 LEFT (x=-100)
     const targetX = this.team === 'A'
-      ? GAME_CONFIG.FIELD.OFFSET_X + GAME_CONFIG.FIELD.WIDTH + GAME_CONFIG.GOAL.WIDTH
-      : GAME_CONFIG.FIELD.OFFSET_X - GAME_CONFIG.GOAL.WIDTH;
+      ? GAME_CONFIG.FIELD.OFFSET_X + GAME_CONFIG.FIELD.WIDTH + GAME_CONFIG.GOAL.WIDTH  // x=900
+      : GAME_CONFIG.FIELD.OFFSET_X - GAME_CONFIG.GOAL.WIDTH;  // x=-100
     const targetY = GAME_CONFIG.FIELD.OFFSET_Y + GAME_CONFIG.FIELD.HEIGHT / 2;
 
     const angle = Math.atan2(targetY - this.y, targetX - this.x);
