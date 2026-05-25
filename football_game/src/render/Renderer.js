@@ -65,29 +65,63 @@ export class Renderer {
     this.ctx.fillRect(0, 0, this.width, this.height);
   }
 
-  // 绘制观众席背景
+  // 绘制观众席背景 - 3D立体效果
   drawAudienceBackground() {
     const ctx = this.ctx;
     const field = GAME_CONFIG.FIELD;
 
-    // 观众席渐变背景 - 上方
+    // 观众席渐变背景 - 上方（近处暗，远处亮，模拟深度）
     const topGradient = ctx.createLinearGradient(0, 0, 0, field.OFFSET_Y);
-    topGradient.addColorStop(0, '#2c3e50');
-    topGradient.addColorStop(1, '#34495e');
+    topGradient.addColorStop(0, '#1a252f');  // 近处（深色）
+    topGradient.addColorStop(0.5, '#2c3e50');
+    topGradient.addColorStop(1, '#3d5166');  // 远处（略亮）
     ctx.fillStyle = topGradient;
     ctx.fillRect(0, 0, this.width, field.OFFSET_Y);
 
     // 观众席渐变背景 - 下方
     const bottomGradient = ctx.createLinearGradient(0, field.OFFSET_Y + field.HEIGHT, 0, this.height);
-    bottomGradient.addColorStop(0, '#34495e');
-    bottomGradient.addColorStop(1, '#2c3e50');
+    bottomGradient.addColorStop(0, '#3d5166');  // 近处
+    bottomGradient.addColorStop(0.5, '#2c3e50');
+    bottomGradient.addColorStop(1, '#1a252f');  // 远处（深色）
     ctx.fillStyle = bottomGradient;
     ctx.fillRect(0, field.OFFSET_Y + field.HEIGHT, this.width, this.height - field.OFFSET_Y - field.HEIGHT);
 
-    // 两侧观众席
-    ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(0, field.OFFSET_Y, field.OFFSET_X, field.HEIGHT);
-    ctx.fillRect(field.OFFSET_X + field.WIDTH, field.OFFSET_Y, field.OFFSET_X, field.HEIGHT);
+    // === 两侧观众席3D立体效果 ===
+    const sideWidth = field.OFFSET_X;
+    const fieldTop = field.OFFSET_Y;
+    const fieldHeight = field.HEIGHT;
+
+    // 左侧观众席 - 渐变深度（内深外浅）
+    const leftGrad = ctx.createLinearGradient(0, fieldTop, sideWidth, fieldTop);
+    leftGrad.addColorStop(0, '#1e3344');  // 紧贴场地（深色）
+    leftGrad.addColorStop(0.6, '#2c3e50');
+    leftGrad.addColorStop(1, '#3d5166');  // 边缘（略亮）
+    ctx.fillStyle = leftGrad;
+    ctx.fillRect(0, fieldTop, sideWidth, fieldHeight);
+
+    // 右侧观众席 - 渐变深度
+    const rightGrad = ctx.createLinearGradient(field.OFFSET_X + field.WIDTH, fieldTop, this.width, fieldTop);
+    rightGrad.addColorStop(0, '#3d5166');  // 紧贴场地
+    rightGrad.addColorStop(0.4, '#2c3e50');
+    rightGrad.addColorStop(1, '#1e3344');  // 边缘
+    ctx.fillStyle = rightGrad;
+    ctx.fillRect(field.OFFSET_X + field.WIDTH, fieldTop, sideWidth, fieldHeight);
+
+    // 垂直深度条带（模拟观众席后排）
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+    for (let i = 0; i < 4; i++) {
+      // 左侧条带
+      ctx.fillRect(sideWidth - 15 - i * 8, fieldTop + i * 3, 3, fieldHeight - i * 6);
+      // 右侧条带
+      ctx.fillRect(field.OFFSET_X + field.WIDTH + 12 + i * 8, fieldTop + i * 3, 3, fieldHeight - i * 6);
+    }
+
+    // 顶部观众席底部边缘阴影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(0, field.OFFSET_Y - 3, this.width, 3);
+
+    // 底部观众席顶部边缘阴影
+    ctx.fillRect(0, field.OFFSET_Y + field.HEIGHT, this.width, 3);
   }
 
   // 生成草地纹理
