@@ -1,6 +1,7 @@
 // 比赛控制器 - 规则和状态管理
 import { GAME_CONFIG } from '../config/game.config.js';
 import { eventBus } from '../core/EventBus.js';
+import { soundSystem } from './SoundSystem.js';
 
 export class MatchController {
   constructor(scene) {
@@ -80,6 +81,7 @@ export class MatchController {
     this.goalScored = true;
     this.goalPauseTimer = GAME_CONFIG.MATCH.GOAL_PAUSE_DURATION;
     this.paused = true;
+    soundSystem.playGoal();
 
     // 更新比分
     // A 队进攻左侧球门（进球左侧球门算 A 得分）

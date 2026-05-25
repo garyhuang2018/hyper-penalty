@@ -11,6 +11,7 @@ import { PhysicsSystem } from '../systems/PhysicsSystem.js';
 import { AIController } from '../systems/AIController.js';
 import { MatchController } from '../systems/MatchController.js';
 import { SkillSystem } from '../systems/SkillSystem.js';
+import { soundSystem } from '../systems/SoundSystem.js';
 import { eventBus } from '../core/EventBus.js';
 
 // 球精灵图生成器
@@ -278,6 +279,7 @@ export class MatchScene {
       if (result) {
         this.ball.shoot(result.power, result.angle, result.isFlame);
         this.matchController.onShoot();
+        soundSystem.playShoot();
       }
     }
   }
@@ -287,6 +289,7 @@ export class MatchScene {
     const redPlayers = this.players.filter(p => p.team === 'A');
     this.activePlayerIndex = (this.activePlayerIndex + direction + redPlayers.length) % redPlayers.length;
     eventBus.emit('playerSwitch', { index: this.activePlayerIndex });
+    soundSystem.playSwitch();
   }
 
   _getActivePlayer() {

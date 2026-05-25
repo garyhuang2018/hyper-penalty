@@ -1,5 +1,6 @@
 // 必杀技系统
 import { GAME_CONFIG } from '../config/game.config.js';
+import { soundSystem } from './SoundSystem.js';
 
 export class SkillSystem {
   constructor(scene) {
@@ -14,6 +15,7 @@ export class SkillSystem {
   startCharging() {
     if (this.ball.isHeld && this.scene.matchController && !this.scene.matchController.isPaused()) {
       this.isCharging = true;
+      soundSystem.playCharge();
     }
   }
 
