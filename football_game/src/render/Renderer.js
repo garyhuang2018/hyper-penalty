@@ -1,6 +1,26 @@
 // Canvas 渲染器
 import { GAME_CONFIG } from '../config/game.config.js';
 
+// 颜色辅助函数 - 将颜色变亮
+function lighten(hex, percent) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.min(255, (num >> 16) + amt);
+  const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+  const B = Math.min(255, (num & 0x0000FF) + amt);
+  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+}
+
+// 颜色辅助函数 - 将颜色变暗
+function darken(hex, percent) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.max(0, (num >> 16) - amt);
+  const G = Math.max(0, ((num >> 8) & 0x00FF) - amt);
+  const B = Math.max(0, (num & 0x0000FF) - amt);
+  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+}
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -274,6 +294,9 @@ export class Renderer {
     ctx.save();
     ctx.translate(x, y);
 
+    // 先绘制阴影（在身体下方）
+    this._drawPlayerShadow(player);
+
     // 根据朝向翻转
     const facingRight = Math.cos(direction) >= 0;
     if (!facingRight) {
@@ -300,16 +323,32 @@ export class Renderer {
     ctx.restore();
   }
 
+  // 绘制球员阴影
+  _drawPlayerShadow(player) {
+    const ctx = this.ctx;
+    const jumpOffset = player.isJumping ? player.jumpHeight : 0;
+    const shadowAlpha = 0.25 - (jumpOffset / 200);
+    const shadowSize = 1 - (jumpOffset / 100);
+
+    ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.05, shadowAlpha)})`;
+    ctx.beginPath();
+    ctx.ellipse(0, 15, 12 * Math.max(0.3, shadowSize), 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // 站立/跑步姿态
   _drawStandingPlayer(skinColor, teamColor, darkColor, legOffset, armOffset) {
     const ctx = this.ctx;
 
-    // 头发 (6x3 px) - 顶部
-    ctx.fillStyle = skinColor;
+    // 头发 (6x3 px) - 顶部高光
+    ctx.fillStyle = lighten(skinColor, 15);
     ctx.fillRect(-3, -23, 6, 3);
 
-    // 头部 (8x6 px) - 眼睛区域
-    ctx.fillStyle = skinColor;
+    // 头部 (8x6 px) - 渐变效果
+    const headGrad = ctx.createLinearGradient(0, -20, 0, -14);
+    headGrad.addColorStop(0, lighten(skinColor, 20));
+    headGrad.addColorStop(1, darken(skinColor, 15));
+    ctx.fillStyle = headGrad;
     ctx.fillRect(-4, -20, 8, 6);
 
     // 眼睛 (2x2 px, 每个)
@@ -317,16 +356,23 @@ export class Renderer {
     ctx.fillRect(-3, -18, 2, 2);
     ctx.fillRect(1, -18, 2, 2);
 
-    // 身体/球衣 (10x10 px)
-    ctx.fillStyle = teamColor;
+    // 身体/球衣 (10x10 px) - 渐变效果
+    const bodyGrad = ctx.createLinearGradient(0, -14, 0, -4);
+    bodyGrad.addColorStop(0, lighten(teamColor, 25));
+    bodyGrad.addColorStop(0.5, teamColor);
+    bodyGrad.addColorStop(1, darken(teamColor, 25));
+    ctx.fillStyle = bodyGrad;
     ctx.fillRect(-5, -14, 10, 10);
 
-    // 手臂 (3x8 px, 每个) - 稍微偏移模拟摆动
-    ctx.fillStyle = skinColor;
+    // 手臂 (3x8 px, 每个) - 渐变效果
+    const armGrad = ctx.createLinearGradient(0, -12, 0, -4);
+    armGrad.addColorStop(0, lighten(skinColor, 20));
+    armGrad.addColorStop(1, darken(skinColor, 15));
+    ctx.fillStyle = armGrad;
     ctx.fillRect(-8, -12, 3, 8 + armOffset);
     ctx.fillRect(5, -12, 3, 8 - armOffset);
 
-    // 腿 (4x10 px, 每条) - 交替前后
+    // 腿 (4x10 px, 每条) - 交替前后（已暗，跳过渐变）
     ctx.fillStyle = darkColor;
     ctx.fillRect(-3, -4 + legOffset, 4, 10);
     ctx.fillRect(-1, -4 - legOffset, 4, 10);
