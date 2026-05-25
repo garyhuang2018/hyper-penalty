@@ -62,11 +62,16 @@ export class AIController {
         this.aiStates.set(player, 'guard_goal');
       }
     } else if (role === 'defender') {
-      // 后卫：主要防守，追球解围
+      // 后卫：主要防守
       if (ball.isHeld && ball.holder.team === 'A') {
+        // 对方带球，追球
         this.aiStates.set(player, 'chase_ball');
+      } else if (ball.isHeld && ball.holder.team === 'B') {
+        // 队友带球，返回防守位置
+        this.aiStates.set(player, 'return');
       } else {
-        this.aiStates.set(player, 'support');
+        // 球自由，回防
+        this.aiStates.set(player, 'return');
       }
     } else {
       // 前锋：进攻为主
@@ -88,7 +93,9 @@ export class AIController {
   _act(player) {
     const ball = this.ball;
     const state = this.aiStates.get(player);
+    const role = player.role;
     const goalToAttack = this.field.getGoalPosition('A');
+    const goalToDefend = this.field.getGoalPosition('B');
 
     let targetX, targetY;
     let speed = GAME_CONFIG.AI.CHASE_SPEED;
@@ -112,9 +119,9 @@ export class AIController {
       case 'chase_ball':
         // 追球
         if (ball.isHeld && ball.holder.team === 'B') {
-          // 队友带球，去支援
+          // 队友带球，去支援（在持球者身后，朝向己方球门方向）
           const holder = ball.holder;
-          targetX = holder.x - 30;
+          targetX = holder.x + 30; // 30是朝向己方球门方向的偏移
           targetY = holder.y;
         } else {
           targetX = ball.x;
@@ -130,16 +137,28 @@ export class AIController {
         break;
 
       case 'support':
-        // 支援
+        // 支援 - 在持球者和己方球门之间位置，不要跑到持球者前方
         if (ball.holder && ball.holder.team === 'B') {
           const holder = ball.holder;
-          // 在持球者前方跑位
-          const angle = holder.direction;
-          targetX = holder.x - Math.cos(angle) * 40;
-          targetY = holder.y - Math.sin(angle) * 40;
+          // 位置在持球者和己方球门中间
+          targetX = (holder.x + goalToDefend.x) / 2;
+          targetY = (holder.y + goalToDefend.y) / 2;
         } else {
+          // 球自由时追球
           targetX = ball.x;
           targetY = ball.y;
+        }
+        break;
+
+      case 'return':
+        // 返回防守位置 - 在己方半场靠近球门的位置
+        if (role === 'defender') {
+          // 后卫留在己方半场中间位置
+          targetX = goalToDefend.x + 150;
+          targetY = ball.y;
+        } else {
+          targetX = goalToDefend.x + 100;
+          targetY = ball.y + (player.y > goalToDefend.y ? -80 : 80);
         }
         break;
 
