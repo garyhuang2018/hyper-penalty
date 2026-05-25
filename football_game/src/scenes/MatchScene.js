@@ -13,6 +13,145 @@ import { MatchController } from '../systems/MatchController.js';
 import { SkillSystem } from '../systems/SkillSystem.js';
 import { eventBus } from '../core/EventBus.js';
 
+// 简单像素精灵图生成器
+class SpriteGenerator {
+  // 生成球员精灵图数据
+  static generatePlayerSprite(team, state, frame, direction) {
+    const colors = team === 'A'
+      ? { body: '#e74c3c', dark: '#c0392b', skin: '#fdbf6f' }
+      : { body: '#3498db', dark: '#2980b9', skin: '#fdbf6f' };
+
+    const sprites = {
+      idle: this._genIdleSprite(colors, direction),
+      running: this._genRunningSprite(colors, frame, direction),
+      shooting: this._genShootingSprite(colors, frame, direction),
+      knocked_down: this._genKnockedDownSprite(colors),
+      getting_up: this._genGettingUpSprite(colors, frame),
+      tackling: this._genTacklingSprite(colors, direction),
+    };
+
+    return sprites[state] || sprites.idle;
+  }
+
+  static _genIdleSprite(colors, direction) {
+    const flip = direction > Math.PI / 2 || direction < -Math.PI / 2;
+    return {
+      pixels: [
+        // 头
+        { x: -4, y: -12, w: 8, h: 8, c: colors.skin },
+        // 身体
+        { x: -5, y: -4, w: 10, h: 10, c: colors.body },
+        { x: -3, y: -2, w: 6, h: 6, c: colors.dark },
+        // 腿
+        { x: -4, y: 6, w: 3, h: 6, c: colors.dark },
+        { x: 1, y: 6, w: 3, h: 6, c: colors.dark },
+      ],
+      flip: flip
+    };
+  }
+
+  static _genRunningSprite(colors, frame, direction) {
+    const flip = direction > Math.PI / 2 || direction < -Math.PI / 2;
+    // 4帧跑步动画
+    const legOffset = [0, 2, 0, -2][frame % 4];
+    const armOffset = [-1, 1, -1, 1][frame % 4];
+
+    return {
+      pixels: [
+        // 头
+        { x: -4, y: -12, w: 8, h: 8, c: colors.skin },
+        // 身体
+        { x: -5, y: -4, w: 10, h: 10, c: colors.body },
+        { x: -3, y: -2, w: 6, h: 6, c: colors.dark },
+        // 手臂
+        { x: -8, y: -3 + armOffset, w: 4, h: 3, c: colors.skin },
+        { x: 4, y: -3 - armOffset, w: 4, h: 3, c: colors.skin },
+        // 腿（动画）
+        { x: -4, y: 6 + legOffset, w: 3, h: 6, c: colors.dark },
+        { x: 1, y: 6 - legOffset, w: 3, h: 6, c: colors.dark },
+      ],
+      flip: flip
+    };
+  }
+
+  static _genShootingSprite(colors, frame, direction) {
+    const flip = direction > Math.PI / 2 || direction < -Math.PI / 2;
+    // 2帧射门动画
+    const kickOffset = frame % 2 === 0 ? 4 : 8;
+
+    return {
+      pixels: [
+        // 头
+        { x: -4, y: -12, w: 8, h: 8, c: colors.skin },
+        // 身体（后仰）
+        { x: -6, y: -4, w: 10, h: 10, c: colors.body },
+        { x: -4, y: -2, w: 6, h: 6, c: colors.dark },
+        // 支撑腿
+        { x: -3, y: 6, w: 3, h: 6, c: colors.dark },
+        // 踢球腿（伸出）
+        { x: 2 + kickOffset, y: 2, w: 8, h: 3, c: colors.dark },
+        // 手臂
+        { x: -9, y: -2, w: 4, h: 3, c: colors.skin },
+        { x: 5, y: -4, w: 4, h: 3, c: colors.skin },
+      ],
+      flip: flip
+    };
+  }
+
+  static _genKnockedDownSprite(colors) {
+    return {
+      pixels: [
+        // 头
+        { x: -6, y: -2, w: 8, h: 6, c: colors.skin },
+        // 身体（躺）
+        { x: 2, y: -1, w: 10, h: 6, c: colors.body },
+        // 腿
+        { x: -10, y: 0, w: 6, h: 3, c: colors.dark },
+        { x: 12, y: 2, w: 6, h: 3, c: colors.dark },
+      ],
+      flip: false
+    };
+  }
+
+  static _genGettingUpSprite(colors, frame) {
+    // 起身动画 - 从躺到站
+    const progress = frame % 4 / 4;
+    const tilt = Math.floor(progress * 3);
+
+    return {
+      pixels: [
+        // 头
+        { x: -4 + tilt, y: -10 + tilt * 2, w: 8, h: 8, c: colors.skin },
+        // 身体
+        { x: -5 + tilt, y: -4 + tilt * 2, w: 10, h: 10, c: colors.body },
+        { x: -3 + tilt, y: -2 + tilt * 2, w: 6, h: 6, c: colors.dark },
+        // 腿
+        { x: -4, y: 6, w: 3, h: 6, c: colors.dark },
+        { x: 1, y: 6, w: 3, h: 6, c: colors.dark },
+      ],
+      flip: false
+    };
+  }
+
+  static _genTacklingSprite(colors, direction) {
+    const flip = direction > Math.PI / 2 || direction < -Math.PI / 2;
+
+    return {
+      pixels: [
+        // 头（低姿态）
+        { x: -4, y: -6, w: 8, h: 6, c: colors.skin },
+        // 身体（滑铲）
+        { x: -8, y: -2, w: 14, h: 6, c: colors.body },
+        { x: -6, y: 0, w: 10, h: 4, c: colors.dark },
+        // 腿（踢出）
+        { x: 6, y: 2, w: 8, h: 3, c: colors.dark },
+        { x: -12, y: 0, w: 5, h: 3, c: colors.dark },
+      ],
+      flip: flip
+    };
+  }
+}
+
 export class MatchScene {
   constructor(canvas) {
     this.canvas = canvas;
@@ -171,41 +310,51 @@ export class MatchScene {
     const ctx = this.renderer.ctx;
     const isActive = player.team === 'A' && this.players.filter(p => p.team === 'A').indexOf(player) === this.activePlayerIndex;
 
-    // 球员圆形
-    ctx.fillStyle = player.getColor();
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-    ctx.fill();
+    // 获取精灵图
+    const sprite = SpriteGenerator.generatePlayerSprite(
+      player.team,
+      player.state,
+      player.animFrame,
+      player.direction
+    );
 
-    // 球员边框
-    ctx.strokeStyle = player.state === 'knocked_down' ? '#888' : '#fff';
-    ctx.lineWidth = isActive ? 3 : 2;
-    ctx.stroke();
+    // 保存上下文状态
+    ctx.save();
 
-    // 当前控制球员标记
+    // 翻转处理
+    if (sprite.flip) {
+      ctx.translate(player.x, player.y);
+      ctx.scale(-1, 1);
+      ctx.translate(-player.x, -player.y);
+    }
+
+    // 绘制像素精灵
+    sprite.pixels.forEach(px => {
+      ctx.fillStyle = px.c;
+      ctx.fillRect(
+        Math.round(player.x + px.x - px.w / 2),
+        Math.round(player.y + px.y - px.h / 2),
+        px.w,
+        px.h
+      );
+    });
+
+    ctx.restore();
+
+    // 当前控制球员标记（光环）
     if (isActive) {
       ctx.strokeStyle = '#ffff00';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(player.x, player.y, player.radius + 5, 0, Math.PI * 2);
+      ctx.arc(player.x, player.y, GAME_CONFIG.PLAYER.RADIUS + 5, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    // 方向指示器
-    if (player.state === 'running' || player.state === 'idle') {
-      const indicatorX = player.x + Math.cos(player.direction) * (player.radius + 5);
-      const indicatorY = player.y + Math.sin(player.direction) * (player.radius + 5);
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(indicatorX, indicatorY, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 倒地状态
+    // 倒地时的地面阴影
     if (player.state === 'knocked_down' || player.state === 'getting_up') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.beginPath();
-      ctx.arc(player.x, player.y + player.radius / 2, player.radius * 0.8, 0, Math.PI * 2);
+      ctx.ellipse(player.x, player.y + 8, player.radius * 0.8, 4, 0, 0, Math.PI * 2);
       ctx.fill();
     }
   }

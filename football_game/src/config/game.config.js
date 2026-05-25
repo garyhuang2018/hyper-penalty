@@ -28,6 +28,14 @@ export const GAME_CONFIG = {
     SPEED: 4,
     COLOR_TEAM_A: '#e74c3c', // 红队
     COLOR_TEAM_B: '#3498db', // 蓝队
+    SPRITE_SIZE: 32,
+  },
+
+  // 像素精灵图配置（简单生成式像素画）
+  SPRITE: {
+    // 球员身体尺寸
+    BODY_SIZE: 12,
+    LEG_SIZE: 8,
   },
 
   // 球设置
