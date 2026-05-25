@@ -52,6 +52,11 @@ export class Player {
     this.dribbleSteps = 0;
     this.isFlame = false;
 
+    // 自然移动属性
+    this.turnSpeed = 0.08;  // 转向速度 (0-1，越大转向越快)
+    this.dribblePhase = 0;  // 带球弧线相位
+    this.dribbleOffset = 0; // 当前带球偏移量
+
     // 位置限制（守门员活动范围）
     this._initPositionConstraints();
   }
@@ -85,7 +90,24 @@ export class Player {
     if (length > 0) {
       dx /= length;
       dy /= length;
-      this.direction = Math.atan2(dy, dx);
+
+      // 计算目标方向
+      const targetDir = Math.atan2(dy, dx);
+
+      // 平滑转向 - 逐步调整方向而非瞬间转向
+      let angleDiff = targetDir - this.direction;
+      // 归一化角度差到 [-PI, PI]
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      this.direction += angleDiff * this.turnSpeed;
+
+      // 带球弧线 - 左右摆动
+      if (this._hasBall()) {
+        this.dribblePhase += 0.1;
+        this.dribbleOffset = Math.sin(this.dribblePhase) * 8;
+      } else {
+        this.dribbleOffset = 0;
+      }
     }
 
     // 检测过人（连按变向）
@@ -107,9 +129,20 @@ export class Player {
     const speedMultiplier = this.getSpeedMultiplier();
     const currentSpeed = this.speed * speedMultiplier;
 
-    // 计算新位置
-    let newX = this.x + dx * currentSpeed;
-    let newY = this.y + dy * currentSpeed;
+    // 计算新位置 - 使用当前朝向而非目标方向
+    let moveX = Math.cos(this.direction);
+    let moveY = Math.sin(this.direction);
+
+    // 应用带球偏移（垂直于移动方向）
+    if (this.dribbleOffset !== 0) {
+      const perpX = -moveY;
+      const perpY = moveX;
+      moveX += perpX * this.dribbleOffset * 0.1;
+      moveY += perpY * this.dribbleOffset * 0.1;
+    }
+
+    let newX = this.x + moveX * currentSpeed;
+    let newY = this.y + moveY * currentSpeed;
 
     // 约束到有效区域
     newX = Math.max(this.minX, Math.min(this.maxX, newX));
@@ -306,6 +339,9 @@ export class Player {
     this.state = 'idle';
     this.vx = 0;
     this.vy = 0;
+    this.dribblePhase = 0;
+    this.dribbleOffset = 0;
+    this.direction = this.team === 'A' ? 0 : Math.PI;
   }
 
   // 碰撞检测（与其他球员）

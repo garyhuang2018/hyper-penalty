@@ -62,19 +62,36 @@ export class AIController {
         this.aiStates.set(player, 'guard_goal');
       }
     } else if (role === 'defender') {
-      // 后卫：主要防守
+      // 后卫 CB：主要防守，保护己方球门
       if (ball.isHeld && ball.holder.team === 'A') {
-        // 对方带球，追球
+        // 对方带球，追球施压
         this.aiStates.set(player, 'chase_ball');
       } else if (ball.isHeld && ball.holder.team === 'B') {
-        // 队友带球，返回防守位置
+        // 队友带球，返回防守位置（不要跑太远去追队友的球）
         this.aiStates.set(player, 'return');
       } else {
         // 球自由，回防
         this.aiStates.set(player, 'return');
       }
+    } else if (role === 'midfielder') {
+      // 中场 CM：攻守兼备，主要支援进攻
+      if (ball.isHeld && ball.holder === player) {
+        // 自己带球，进攻！
+        this.aiStates.set(player, 'attack');
+      } else if (ball.isHeld) {
+        if (ball.holder.team === 'B') {
+          // 队友带球，支援进攻（在队友侧后方）
+          this.aiStates.set(player, 'support');
+        } else {
+          // 对方带球，中场拦截
+          this.aiStates.set(player, 'chase_ball');
+        }
+      } else {
+        // 球自由，追球
+        this.aiStates.set(player, 'chase_ball');
+      }
     } else {
-      // 前锋：进攻为主
+      // 前锋 ST：主要进攻
       if (ball.isHeld && ball.holder === player) {
         // 自己带球，进攻！
         this.aiStates.set(player, 'attack');
@@ -137,10 +154,10 @@ export class AIController {
         break;
 
       case 'attack':
-        // 带球进攻 - 朝对方球门移动，速度较慢
+        // 带球进攻 - 朝对方球门移动
         targetX = goalToAttack.x;
         targetY = goalToAttack.y;
-        speed = GAME_CONFIG.AI.CHASE_SPEED; // 和普通移动一样慢
+        speed = GAME_CONFIG.AI.CHASE_SPEED;
         break;
 
       case 'support':
@@ -151,6 +168,10 @@ export class AIController {
           // 在持球者身后（防守方向）
           targetX = holder.x + 40; // +40 is toward own goal for Blue
           targetY = holder.y;
+          // 中场支援时可以稍微靠边
+          if (role === 'midfielder') {
+            targetY = holder.y + (player.y > holder.y ? -60 : 60);
+          }
         } else {
           targetX = ball.x;
           targetY = ball.y;
@@ -158,14 +179,19 @@ export class AIController {
         break;
 
       case 'return':
-        // 返回防守位置 - 在己方半场靠近球门的位置
+        // 返回防守位置 - 根据角色返回不同位置
         if (role === 'defender') {
-          // 后卫留在己方半场中间位置
+          // 后卫留在己方半场靠近球门的位置
           targetX = goalToDefend.x + 150;
           targetY = ball.y;
-        } else {
-          targetX = goalToDefend.x + 100;
+        } else if (role === 'midfielder') {
+          // 中场回防到中场位置
+          targetX = goalToDefend.x + 250;
           targetY = ball.y + (player.y > goalToDefend.y ? -80 : 80);
+        } else {
+          // 前锋回防稍微靠后
+          targetX = goalToDefend.x + 180;
+          targetY = ball.y + (player.y > goalToDefend.y ? -60 : 60);
         }
         break;
 
@@ -185,16 +211,18 @@ export class AIController {
       player.move(moveX, moveY);
     }
 
-    // 尝试射门
-    if (player.role === 'forward' && ball.isHeld && ball.holder === player) {
+    // 尝试射门 - 前锋和中场都可以射门
+    if ((player.role === 'striker' || player.role === 'midfielder') && ball.isHeld && ball.holder === player) {
       const goalPos = this.field.getGoalPosition('A');
       const distToGoal = Math.sqrt(
         Math.pow(goalPos.x - player.x, 2) +
         Math.pow(goalPos.y - player.y, 2)
       );
 
-      // 距球门一定范围内射门
-      if (distToGoal < 200 && Math.random() < 0.03) {
+      // 前锋射门距离更远，中场射门距离较短
+      const shootRange = player.role === 'striker' ? 200 : 150;
+
+      if (distToGoal < shootRange && Math.random() < 0.03) {
         const shootResult = player.shoot(12, false);
         if (shootResult) {
           ball.shoot(shootResult.power, shootResult.angle, shootResult.isFlame);

@@ -423,15 +423,15 @@ export class MatchScene {
   }
 
   _switchPlayer(direction) {
-    // 获取红队球员（玩家控制的队伍）
-    const redPlayers = this.players.filter(p => p.team === 'A');
+    // 获取红队非守门员球员（玩家控制的队伍，排除守门员）
+    const redPlayers = this.players.filter(p => p.team === 'A' && p.role !== 'goalkeeper');
     this.activePlayerIndex = (this.activePlayerIndex + direction + redPlayers.length) % redPlayers.length;
     eventBus.emit('playerSwitch', { index: this.activePlayerIndex });
     soundSystem.playSwitch();
   }
 
   _getActivePlayer() {
-    const redPlayers = this.players.filter(p => p.team === 'A');
+    const redPlayers = this.players.filter(p => p.team === 'A' && p.role !== 'goalkeeper');
     return redPlayers[this.activePlayerIndex];
   }
 
@@ -494,7 +494,9 @@ export class MatchScene {
 
   _renderPlayer(player, index) {
     const ctx = this.renderer.ctx;
-    const isActive = player.team === 'A' && this.players.filter(p => p.team === 'A').indexOf(player) === this.activePlayerIndex;
+    // 活跃玩家需要排除守门员后计算索引
+    const redFieldPlayers = this.players.filter(p => p.team === 'A' && p.role !== 'goalkeeper');
+    const isActive = player.team === 'A' && redFieldPlayers.indexOf(player) === this.activePlayerIndex;
 
     // 使用 Renderer 的 drawPlayer 方法绘制像素精灵
     this.renderer.drawPlayer(player);
@@ -631,7 +633,7 @@ export class MatchScene {
     this.ball.holder = null;
     this.ball.isFlame = false;
 
-    // 重置球员位置
+    // 重置球员位置 - 根据角色查找对应位置
     const positions = {
       A: this.field.getStartingPositions('A'),
       B: this.field.getStartingPositions('B')
@@ -639,13 +641,19 @@ export class MatchScene {
 
     this.players.forEach((player, index) => {
       const teamPositions = positions[player.team];
-      let posIndex;
-      if (player.role === 'goalkeeper') posIndex = 0;
-      else if (player.role === 'defender') posIndex = 1;
-      else posIndex = 2;
-
+      // 根据角色找到对应位置索引
+      let posIndex = teamPositions.findIndex(p => p.role === player.role);
+      // 如果找不到精确匹配（如defender有2个），使用第一个匹配的
+      if (posIndex === -1) {
+        if (player.role === 'goalkeeper') posIndex = 0;
+        else if (player.role === 'defender') posIndex = 1;
+        else if (player.role === 'midfielder') posIndex = 3;
+        else if (player.role === 'striker') posIndex = 5;
+      }
       const pos = teamPositions[posIndex];
-      player.resetPosition(pos.x, pos.y);
+      if (pos) {
+        player.resetPosition(pos.x, pos.y);
+      }
     });
   }
 

@@ -27,27 +27,35 @@ export class Field {
     }
   }
 
-  // 获取某球队的初始球员位置
+  // 获取某球队的初始球员位置 (6v6阵型: 1 GK + 2 CB + 2 CM + 1 ST)
   getStartingPositions(team) {
     const center = this.getCenter();
     const positions = [];
 
     if (team === 'A') {
-      // 红队 - 左侧
-      // 守门员
+      // 红队 - 左侧 (1-2-2-1阵型)
+      // 守门员 GK
       positions.push({ x: this.x + 50, y: center.y, role: 'goalkeeper' });
-      // 后卫
-      positions.push({ x: this.x + 150, y: center.y - 100, role: 'defender' });
-      // 前锋
-      positions.push({ x: this.x + 250, y: center.y, role: 'forward' });
+      // 后卫 CB x2
+      positions.push({ x: this.x + 150, y: center.y - 80, role: 'defender' });
+      positions.push({ x: this.x + 150, y: center.y + 80, role: 'defender' });
+      // 中场 CM x2
+      positions.push({ x: this.x + 280, y: center.y - 100, role: 'midfielder' });
+      positions.push({ x: this.x + 280, y: center.y + 100, role: 'midfielder' });
+      // 前锋 ST
+      positions.push({ x: this.x + 380, y: center.y, role: 'striker' });
     } else {
-      // 蓝队 - 右侧
-      // 守门员
+      // 蓝队 - 右侧 (镜像阵型)
+      // 守门员 GK
       positions.push({ x: this.x + this.width - 50, y: center.y, role: 'goalkeeper' });
-      // 后卫
-      positions.push({ x: this.x + this.width - 150, y: center.y + 100, role: 'defender' });
-      // 前锋
-      positions.push({ x: this.x + this.width - 250, y: center.y, role: 'forward' });
+      // 后卫 CB x2
+      positions.push({ x: this.x + this.width - 150, y: center.y - 80, role: 'defender' });
+      positions.push({ x: this.x + this.width - 150, y: center.y + 80, role: 'defender' });
+      // 中场 CM x2
+      positions.push({ x: this.x + this.width - 280, y: center.y - 100, role: 'midfielder' });
+      positions.push({ x: this.x + this.width - 280, y: center.y + 100, role: 'midfielder' });
+      // 前锋 ST
+      positions.push({ x: this.x + this.width - 380, y: center.y, role: 'striker' });
     }
 
     return positions;

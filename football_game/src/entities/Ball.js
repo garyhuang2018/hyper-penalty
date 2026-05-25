@@ -22,10 +22,16 @@ export class Ball {
   update() {
     if (this.isHeld && this.holder) {
       // 跟随持有者
-      const offsetX = Math.cos(this.holder.direction) * (this.holder.radius + this.radius + 2);
-      const offsetY = Math.sin(this.holder.direction) * (this.holder.radius + this.radius + 2);
-      this.x = this.holder.x + offsetX;
-      this.y = this.holder.y + offsetY;
+      const baseOffsetX = Math.cos(this.holder.direction) * (this.holder.radius + this.radius + 2);
+      const baseOffsetY = Math.sin(this.holder.direction) * (this.holder.radius + this.radius + 2);
+
+      // 应用带球弧线偏移（垂直于移动方向）
+      const perpX = -Math.sin(this.holder.direction);
+      const perpY = Math.cos(this.holder.direction);
+      const dribbleOffset = this.holder.dribbleOffset || 0;
+
+      this.x = this.holder.x + baseOffsetX + perpX * dribbleOffset;
+      this.y = this.holder.y + baseOffsetY + perpY * dribbleOffset;
       this.vx = 0;
       this.vy = 0;
       this.loftHeight = this.holder.isJumping ? this.holder.jumpHeight : 0;
