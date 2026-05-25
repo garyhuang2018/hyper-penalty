@@ -305,13 +305,41 @@ export class MatchScene {
     const player = this._getActivePlayer();
     if (!player) return;
 
+    // 守门员扑救
+    if (player.role === 'goalkeeper') {
+      this._goalkeeperSave(player);
+      return;
+    }
+
     if (this.ball.holder === player) {
-      // 带球时射门
-      this._shoot(player);
+      // 带球跳起+射门 = 必杀技高跳射门
+      if (player.isJumping) {
+        this._shoot(player);
+      } else {
+        // 带球时射门
+        this._shoot(player);
+      }
     } else {
-      // 无球时撞人
+      // 无球时：奔跑中按前+K = 头撞
+      if (this._tryHeader(player)) {
+        return;
+      }
+      // 否则撞人
       this._bump(player);
     }
+  }
+
+  // 尝试头撞（奔跑中面向方向且按前）
+  _tryHeader(player) {
+    if (player.state !== 'running') return false;
+
+    // 检查是否按住了前方向（根据玩家朝向判断）
+    const isPressingForward = true; // 简化：只要在跑动就认为面向前方
+
+    if (isPressingForward && this._isBallNear(player)) {
+      return this._header(player);
+    }
+    return false;
   }
 
   _handleJump() {
@@ -629,5 +657,92 @@ export class MatchScene {
   // 获取红队控制的球员
   getControlledPlayer() {
     return this._getActivePlayer();
+  }
+
+  // 守门员扑救
+  _goalkeeperSave(player) {
+    // 获取守门员面向方向
+    const dirX = Math.cos(player.direction);
+    const dirY = Math.sin(player.direction);
+    this._goalkeeperDive(player, dirX, dirY);
+  }
+
+  _goalkeeperDive(player, dirX, dirY) {
+    // 扑救移动距离
+    const diveDistance = 30;
+    const targetX = player.x + dirX * diveDistance;
+    const targetY = player.y + dirY * diveDistance;
+
+    // 临时移动守门员
+    const originalX = player.x;
+    const originalY = player.y;
+    player.x = Math.max(player.minX, Math.min(player.maxX, targetX));
+    player.y = Math.max(player.minY, Math.min(player.maxY, targetY));
+
+    // 检查是否能碰到球
+    const ball = this.ball;
+    const dist = Math.sqrt((ball.x - player.x) ** 2 + (ball.y - player.y) ** 2);
+
+    if (dist < player.radius + ball.radius + 10) {
+      // 扑救成功 - 打飞球
+      const punchPower = 15;
+      const punchAngle = Math.atan2(dirY, dirX);
+      ball.shoot(punchPower, punchAngle, false);
+      soundSystem.playShoot();
+    }
+
+    // 恢复位置
+    player.x = originalX;
+    player.y = originalY;
+  }
+
+  // 头撞（奔跑中按前+K）
+  _header(player) {
+    if (player.state !== 'running') return false;
+    if (!this._isBallNear(player)) return false;
+
+    const ball = this.ball;
+    // 带球时头球：释放球并向上击出
+    if (ball.holder === player) {
+      ball.release();
+    }
+
+    // 计算头球方向：朝向对方球门并向上
+    const angle = Math.atan2(-0.5, player.direction > Math.PI / 2 || player.direction < -Math.PI / 2 ? -1 : 1);
+    ball.loft(12, angle);
+
+    // 撞到对方可能倒地
+    const opponent = this._findNearestOpponent(player);
+    if (opponent) {
+      const dist = Math.sqrt((opponent.x - player.x) ** 2 + (opponent.y - player.y) ** 2);
+      if (dist < player.radius + opponent.radius + 20) {
+        if (Math.random() < 0.5) {
+          opponent.knockDown();
+        }
+        if (Math.random() < 0.2) {
+          player.knockDown();
+        }
+      }
+    }
+
+    return true;
+  }
+
+  _isBallNear(player) {
+    return this.ball.distanceTo(player) < player.radius + this.ball.radius + 10;
+  }
+
+  _findNearestOpponent(player) {
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const p of this.players) {
+      if (p.team === player.team) continue;
+      const dist = Math.sqrt((p.x - player.x) ** 2 + (p.y - player.y) ** 2);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = p;
+      }
+    }
+    return nearest;
   }
 }

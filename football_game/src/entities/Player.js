@@ -43,6 +43,15 @@ export class Player {
     // 撞人冷却
     this.bumpCooldown = 0;
 
+    // 过人状态（连按变向）
+    this._lastDirections = [];
+    this._lastDirectionTime = 0;
+    this.STEP_OVER_WINDOW = 200; // 200ms 内连按同方向触发过人
+
+    // 带球步数统计（必杀技）
+    this.dribbleSteps = 0;
+    this.isFlame = false;
+
     // 位置限制（守门员活动范围）
     this._initPositionConstraints();
   }
@@ -79,6 +88,21 @@ export class Player {
       this.direction = Math.atan2(dy, dx);
     }
 
+    // 检测过人（连按变向）
+    const now = Date.now();
+    const dirKey = `${dx},${dy}`;
+    if (now - this._lastDirectionTime < this.STEP_OVER_WINDOW) {
+      const lastDir = this._lastDirections[this._lastDirections.length - 1];
+      if (lastDir === dirKey) {
+        this._triggerStepOver(dx, dy);
+      }
+    }
+    this._lastDirections.push(dirKey);
+    this._lastDirectionTime = now;
+    if (this._lastDirections.length > 2) {
+      this._lastDirections.shift();
+    }
+
     // 速度倍率（加速 + 铲球）
     const speedMultiplier = this.getSpeedMultiplier();
     const currentSpeed = this.speed * speedMultiplier;
@@ -94,6 +118,14 @@ export class Player {
     this.x = newX;
     this.y = newY;
 
+    // 更新带球步数
+    if (this._hasBall()) {
+      this.dribbleSteps++;
+      if (this.dribbleSteps >= 11) {
+        this.isFlame = true;
+      }
+    }
+
     // 更新状态
     if (length > 0) {
       this.state = 'running';
@@ -101,6 +133,16 @@ export class Player {
     } else {
       this.state = 'idle';
     }
+  }
+
+  // 触发过人变向
+  _triggerStepOver(dx, dy) {
+    // 变向：向相反方向移动一小段，然后改变方向
+    this.direction = Math.atan2(-dy, -dx);
+    // 给予短暂的加速效果作为视觉反馈
+    const stepSpeed = this.speed * 2;
+    this.x += dx * stepSpeed * 0.5;
+    this.y += dy * stepSpeed * 0.5;
   }
 
   // 铲球

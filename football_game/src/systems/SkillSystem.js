@@ -26,10 +26,37 @@ export class SkillSystem {
   }
 
   release(player) {
+    // 带球11步后自动火焰球
+    if (player.dribbleSteps >= 11) {
+      player.isFlame = true;
+    }
+
     if (!this.isCharging || !this.ball.isHeld) {
+      // 非蓄力射门也检查火焰球条件
+      const isFlame = player.isFlame || this.charge >= GAME_CONFIG.SKILL.FLAME_THRESHOLD;
+      if (!this.ball.isHeld) {
+        this.isCharging = false;
+        this.charge = 0;
+        return null;
+      }
+
+      const power = this._calculatePower();
+      const flame = isFlame;
+
+      // 方向朝向对方球门
+      const goalX = player.team === 'A'
+        ? GAME_CONFIG.FIELD.OFFSET_X + GAME_CONFIG.FIELD.WIDTH + GAME_CONFIG.GOAL.WIDTH
+        : GAME_CONFIG.FIELD.OFFSET_X - GAME_CONFIG.GOAL.WIDTH;
+      const goalY = GAME_CONFIG.FIELD.OFFSET_Y + GAME_CONFIG.FIELD.HEIGHT / 2;
+      const angle = Math.atan2(goalY - player.y, goalX - player.x);
+
+      // 重置
       this.isCharging = false;
       this.charge = 0;
-      return null;
+      player.dribbleSteps = 0;
+      player.isFlame = false;
+
+      return { power, angle, isFlame: flame };
     }
 
     const power = this._calculatePower();
@@ -45,6 +72,8 @@ export class SkillSystem {
     // 重置蓄力
     this.isCharging = false;
     this.charge = 0;
+    player.dribbleSteps = 0;
+    player.isFlame = false;
 
     return { power, angle, isFlame };
   }
