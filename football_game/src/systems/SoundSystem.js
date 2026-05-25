@@ -41,6 +41,31 @@ export class SoundSystem {
     oscillator.stop(now + 0.1);
   }
 
+  // 传球音 - 轻快短促的声音
+  playPass() {
+    if (!this.enabled) return;
+    this._initAudioContext();
+
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(600, now);
+    oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+
+    gainNode.gain.setValueAtTime(0.15, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.08);
+  }
+
   // 进球音 - 频率上升的欢呼音效
   playGoal() {
     if (!this.enabled) return;

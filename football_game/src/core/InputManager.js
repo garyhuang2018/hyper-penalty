@@ -72,5 +72,7 @@ export const KEYS = {
   ENTER: 'Enter',
   Q: 'KeyQ',  // 换人
   E: 'KeyE',  // 换人
-  SHIFT: 'ShiftLeft',  // 铲球
+  SHIFT: 'ShiftLeft',  // 加速
+  J: 'KeyJ',  // 传球(带球)/铲球(无球)
+  K: 'KeyK',  // 射门(带球)/撞人(无球)
 };

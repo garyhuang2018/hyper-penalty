@@ -254,23 +254,122 @@ export class MatchScene {
     this.inputManager.onKeyDown(KEYS.A, () => this._move(-1, 0));
     this.inputManager.onKeyDown(KEYS.D, () => this._move(1, 0));
 
-    // 射门（松开空格键时）
-    this.inputManager.onKeyDown(KEYS.SPACE, () => this.skillSystem.startCharging());
-    this.inputManager.onKeyUp(KEYS.SPACE, () => this._shoot());
+    // 加速（按住 Shift）
+    this.inputManager.onKeyDown(KEYS.SHIFT, () => this._startAccelerate());
+    this.inputManager.onKeyUp(KEYS.SHIFT, () => this._stopAccelerate());
+
+    // 传球(带球)/铲球(无球) - J键
+    this.inputManager.onKeyDown(KEYS.J, () => this._handleJ());
+
+    // 射门(带球)/撞人(无球) - K键
+    this.inputManager.onKeyDown(KEYS.K, () => this._handleK());
+
+    // 跳起/挑球 - Space
+    this.inputManager.onKeyDown(KEYS.SPACE, () => this._handleJump());
 
     // 换人
     this.inputManager.onKeyDown(KEYS.Q, () => this._switchPlayer(-1));
     this.inputManager.onKeyDown(KEYS.E, () => this._switchPlayer(1));
-
-    // 铲球
-    this.inputManager.onKeyDown(KEYS.SHIFT, () => this._tackle());
   }
 
-  _tackle() {
+  _startAccelerate() {
+    const player = this._getActivePlayer();
+    if (player) {
+      player.isAccelerating = true;
+    }
+  }
+
+  _stopAccelerate() {
+    const player = this._getActivePlayer();
+    if (player) {
+      player.isAccelerating = false;
+    }
+  }
+
+  _handleJ() {
     if (this.matchController.isPaused()) return;
-    const activePlayer = this._getActivePlayer();
-    if (activePlayer) {
-      activePlayer.tackle();
+    const player = this._getActivePlayer();
+    if (!player) return;
+
+    if (this.ball.holder === player) {
+      // 带球时传球
+      this._pass(player);
+    } else {
+      // 无球时铲球
+      this._tackle(player);
+    }
+  }
+
+  _handleK() {
+    if (this.matchController.isPaused()) return;
+    const player = this._getActivePlayer();
+    if (!player) return;
+
+    if (this.ball.holder === player) {
+      // 带球时射门
+      this._shoot(player);
+    } else {
+      // 无球时撞人
+      this._bump(player);
+    }
+  }
+
+  _handleJump() {
+    if (this.matchController.isPaused()) return;
+    const player = this._getActivePlayer();
+    if (!player) return;
+
+    if (this.ball.holder === player) {
+      // 带球时挑球过顶
+      this._loft(player);
+    } else {
+      // 无球时跳起
+      player.jump();
+    }
+  }
+
+  _pass(player) {
+    // 找面向方向的队友传球
+    const teammates = this.players.filter(p => p.team === player.team && p !== player);
+    if (teammates.length === 0) return;
+
+    // 简化：传给距离最近的队友
+    let nearestTeammate = null;
+    let nearestDist = Infinity;
+    teammates.forEach(t => {
+      const dist = Math.sqrt((t.x - player.x) ** 2 + (t.y - player.y) ** 2);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestTeammate = t;
+      }
+    });
+
+    if (nearestTeammate) {
+      const angle = Math.atan2(nearestTeammate.y - player.y, nearestTeammate.x - player.x);
+      const result = player.pass(angle);
+      if (result) {
+        this.ball.pass(result.power, result.angle);
+        soundSystem.playPass();
+      }
+    }
+  }
+
+  _loft(player) {
+    // 挑球过顶
+    const result = player.pass();
+    if (result) {
+      this.ball.loft(result.power * 0.7, result.angle);
+      soundSystem.playPass();
+    }
+  }
+
+  _tackle(player) {
+    player.tackle();
+  }
+
+  _bump(player) {
+    if (player.bump()) {
+      // 撞人逻辑由 PhysicsSystem 处理
     }
   }
 
@@ -282,9 +381,9 @@ export class MatchScene {
     }
   }
 
-  _shoot() {
+  _shoot(player) {
     if (this.matchController.isPaused()) return;
-    const activePlayer = this._getActivePlayer();
+    const activePlayer = player || this._getActivePlayer();
     if (activePlayer && this.ball.holder === activePlayer) {
       const result = this.skillSystem.release(activePlayer);
       if (result) {

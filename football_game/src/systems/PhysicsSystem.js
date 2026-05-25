@@ -66,6 +66,22 @@ export class PhysicsSystem {
           p2.x += nx * overlap / 2;
           p2.y += ny * overlap / 2;
 
+          // 撞人检测：检测是否有一方处于撞人状态
+          if (p1.bumpCooldown > 0 || p2.bumpCooldown > 0) {
+            // 撞人者和被撞者都可能倒地
+            const bumpingPlayer = p1.bumpCooldown > 0 ? p1 : p2;
+            const bumpedPlayer = p1.bumpCooldown > 0 ? p2 : p1;
+
+            // 70% 概率被撞倒
+            if (Math.random() < 0.7) {
+              bumpedPlayer.knockDown();
+            }
+            // 撞人者自己也有 30% 概率倒地
+            if (Math.random() < 0.3) {
+              bumpingPlayer.knockDown();
+            }
+          }
+
           // 不同队球员碰撞可能抢球
           if (p1.team !== p2.team && this.ball.holder) {
             const holder = this.ball.holder;

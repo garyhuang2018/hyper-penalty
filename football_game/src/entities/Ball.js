@@ -11,6 +11,8 @@ export class Ball {
     this.friction = GAME_CONFIG.BALL.FRICTION;
     this.isHeld = false;      // 是否被球员持有
     this.isFlame = false;     // 是否是火焰球
+    this.isLofted = false;    // 是否在空中（挑球过顶）
+    this.loftHeight = 0;      // 空中高度
     this.holder = null;       // 持有者的引用
     this.animFrame = 0;       // 动画帧
     this.animTimer = 0;        // 动画计时器
@@ -26,6 +28,7 @@ export class Ball {
       this.y = this.holder.y + offsetY;
       this.vx = 0;
       this.vy = 0;
+      this.loftHeight = this.holder.isJumping ? this.holder.jumpHeight : 0;
     } else {
       // 应用摩擦力
       this.vx *= this.friction;
@@ -39,6 +42,12 @@ export class Ball {
       this.x += this.vx;
       this.y += this.vy;
 
+      // 更新挑球高度（抛物线下降）
+      if (this.isLofted && this.loftHeight > 0) {
+        this.loftHeight -= 1.5;
+        if (this.loftHeight < 0) this.loftHeight = 0;
+      }
+
       // 场地边界碰撞
       this._constrainToField();
     }
@@ -51,6 +60,26 @@ export class Ball {
     this.vx = Math.cos(direction) * power;
     this.vy = Math.sin(direction) * power;
     this.isFlame = isFlame;
+    this.isLofted = false;
+  }
+
+  // 挑球过顶（传球的一种特殊形式）
+  loft(power, direction) {
+    this.isHeld = false;
+    this.holder = null;
+    this.vx = Math.cos(direction) * power * 0.8;
+    this.vy = Math.sin(direction) * power * 0.8;
+    this.isLofted = true;
+    this.loftHeight = 40; // 挑球最高高度
+  }
+
+  // 传球飞行
+  pass(power, direction) {
+    this.isHeld = false;
+    this.holder = null;
+    this.vx = Math.cos(direction) * power;
+    this.vy = Math.sin(direction) * power;
+    this.isLofted = false;
   }
 
   // 被持有

@@ -23,6 +23,15 @@ export class Player {
     this.power = 10;      // 射门力量
     this.technique = 5;   // 带球/铲球精度
 
+    // 加速状态
+    this.isAccelerating = false;
+    this.accelerateMultiplier = 1.5;
+
+    // 跳起状态
+    this.isJumping = false;
+    this.jumpHeight = 0;
+    this.jumpTimer = 0;
+
     // 动画相关
     this.animFrame = 0;
     this.animTimer = 0;
@@ -30,6 +39,9 @@ export class Player {
     // 倒地状态
     this.knockedTimer = 0;
     this.getUpTimer = 0;
+
+    // 撞人冷却
+    this.bumpCooldown = 0;
 
     // 位置限制（守门员活动范围）
     this._initPositionConstraints();
@@ -67,8 +79,8 @@ export class Player {
       this.direction = Math.atan2(dy, dx);
     }
 
-    // 铲球状态速度 × 1.2
-    const speedMultiplier = this.getTackleSpeedMultiplier();
+    // 速度倍率（加速 + 铲球）
+    const speedMultiplier = this.getSpeedMultiplier();
     const currentSpeed = this.speed * speedMultiplier;
 
     // 计算新位置
@@ -106,8 +118,63 @@ export class Player {
     return true;
   }
 
+  // 传球（带球时）
+  pass(targetAngle) {
+    if (this.state === 'knocked_down' || this.state === 'getting_up') return null;
+    if (!this._hasBall()) return null;
+
+    // 传球方向基于面向方向或指定目标方向
+    const passAngle = targetAngle !== undefined ? targetAngle : this.direction;
+    const passPower = 12; // 传球力度
+
+    this.state = 'running';
+
+    return { power: passPower, angle: passAngle };
+  }
+
+  // 撞人（无球时）
+  bump() {
+    if (this.state === 'knocked_down' || this.state === 'getting_up') return false;
+    if (this.bumpCooldown > 0) return false;
+
+    this.state = 'running';
+    this.bumpCooldown = 1000; // 1秒冷却
+
+    return true;
+  }
+
+  // 跳起/挑球
+  jump() {
+    if (this.state === 'knocked_down' || this.state === 'getting_up') return false;
+    if (this.isJumping) return false;
+
+    this.isJumping = true;
+    this.jumpTimer = 500; // 0.5秒跳起时间
+    this.state = 'running';
+
+    return true;
+  }
+
+  // 是否持有球
+  _hasBall() {
+    return this.ball && this.ball.holder === this;
+  }
+
+  // 设置持有的球引用
+  setBall(ball) {
+    this.ball = ball;
+  }
+
   // 获取铲球时的速度倍率
   getTackleSpeedMultiplier() {
+    return this.state === 'tackling' ? 1.2 : 1.0;
+  }
+
+  // 获取加速时的速度倍率
+  getSpeedMultiplier() {
+    if (this.isAccelerating) {
+      return this.accelerateMultiplier;
+    }
     return this.state === 'tackling' ? 1.2 : 1.0;
   }
 
@@ -155,6 +222,24 @@ export class Player {
       if (this.getUpTimer <= 0) {
         this.state = 'idle';
       }
+    }
+
+    // 更新跳起状态
+    if (this.isJumping) {
+      this.jumpTimer -= deltaTime;
+      if (this.jumpTimer <= 0) {
+        this.isJumping = false;
+        this.jumpHeight = 0;
+      } else {
+        // 计算跳起高度（抛物线）
+        const progress = 1 - (this.jumpTimer / 500);
+        this.jumpHeight = Math.sin(progress * Math.PI) * 30; // 最高30px
+      }
+    }
+
+    // 更新撞人冷却
+    if (this.bumpCooldown > 0) {
+      this.bumpCooldown -= deltaTime;
     }
   }
 
