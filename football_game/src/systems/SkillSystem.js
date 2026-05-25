@@ -31,6 +31,11 @@ export class SkillSystem {
       player.isFlame = true;
     }
 
+    // 高跳射门必杀 - 跳到最高点时射门 = 火焰球
+    if (player.isJumping && player.jumpHeight > 50) {
+      player.isFlame = true;
+    }
+
     if (!this.isCharging || !this.ball.isHeld) {
       // 非蓄力射门也检查火焰球条件
       const isFlame = player.isFlame || this.charge >= GAME_CONFIG.SKILL.FLAME_THRESHOLD;

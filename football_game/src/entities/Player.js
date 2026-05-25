@@ -172,10 +172,16 @@ export class Player {
   _triggerStepOver(dx, dy) {
     // 变向：向相反方向移动一小段，然后改变方向
     this.direction = Math.atan2(-dy, -dx);
-    // 给予短暂的加速效果作为视觉反馈
-    const stepSpeed = this.speed * 2;
+
+    // 过人时增加速度爆发，过人时速度×1.5
+    const stepOverBonus = 1.5;
+    const stepSpeed = this.speed * stepOverBonus;
     this.x += dx * stepSpeed * 0.5;
     this.y += dy * stepSpeed * 0.5;
+
+    // 触发后短暂无敌（0.2秒）
+    this.isStepOverInvincible = true;
+    setTimeout(() => { this.isStepOverInvincible = false; }, 200);
   }
 
   // 铲球

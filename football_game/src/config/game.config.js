@@ -65,7 +65,7 @@ export const GAME_CONFIG = {
   // AI 设置
   AI: {
     THINK_INTERVAL: 500,   // AI 决策间隔 ms
-    CHASE_SPEED: 3,
-    ATTACK_SPEED: 3.5,
+    CHASE_SPEED: 3.5,     // AI追逐速度（提升到与玩家相近）
+    ATTACK_SPEED: 4,      // AI进攻速度（提升）
   },
 };

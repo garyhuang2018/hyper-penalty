@@ -225,6 +225,10 @@ export class MatchScene {
     // 玩家当前控制的球员索引
     this.activePlayerIndex = 2; // 默认控制前锋
 
+    // AB连按追踪（用于守门员无敌扑救）
+    this._abPressTimes = [];
+    this._abWindow = 500; // 500ms内连按触发无敌扑救
+
     // 注册输入
     this._registerInput();
 
@@ -263,6 +267,10 @@ export class MatchScene {
 
     // 射门(带球)/撞人(无球) - K键
     this.inputManager.onKeyDown(KEYS.K, () => this._handleK());
+
+    // AB连按检测（守门员无敌扑救）
+    this.inputManager.onKeyDown(KEYS.A, () => this._handleAB());
+    this.inputManager.onKeyDown(KEYS.W, () => this._handleAB());
 
     // 跳起/挑球 - Space
     this.inputManager.onKeyDown(KEYS.SPACE, () => this._handleJump());
@@ -668,6 +676,67 @@ export class MatchScene {
   }
 
   // 守门员扑救
+  // 连续AB无敌扑救
+  _handleAB() {
+    if (!this._isGoalkeeperState()) return;
+
+    const now = Date.now();
+    // 记录按键时间
+    this._abPressTimes.push(now);
+
+    // 清理超出窗口的记录
+    this._abPressTimes = this._abPressTimes.filter(t => now - t < this._abWindow);
+
+    // 500ms内连续按A+B超过2次触发无敌扑救
+    if (this._abPressTimes.length >= 3) {
+      this._handleGoalkeeperSave();
+      this._abPressTimes = []; // 重置
+    }
+  }
+
+  _handleGoalkeeperSave() {
+    // 守门员状态下，连续按A+B触发无敌扑救
+    // 成功率90%，无敌状态下全身发光
+    if (!this._isGoalkeeperState()) return;
+
+    this._goalkeeperInvincible = true;
+    this._goalkeeperInvincibleTimer = 1000; // 无敌持续1秒
+
+    // 90%成功率
+    const success = Math.random() < 0.9;
+    if (success) {
+      this._goalkeeperSuperSave();
+    }
+  }
+
+  _isGoalkeeperState() {
+    const player = this._getActivePlayer();
+    return player && player.role === 'goalkeeper';
+  }
+
+  _goalkeeperSuperSave() {
+    // 无敌扑救：守门员全身发光，将球完全击飞
+    const player = this._getActivePlayer();
+    if (!player) return;
+
+    // 临时标记发光效果
+    player.isGlowing = true;
+    setTimeout(() => { player.isGlowing = false; }, 500);
+
+    // 检查是否能碰到球
+    const ball = this.ball;
+    const dist = Math.sqrt((ball.x - player.x) ** 2 + (ball.y - player.y) ** 2);
+
+    if (dist < player.radius + ball.radius + 20) {
+      // 超级扑救 - 球被击飞到远离球门的位置
+      const punchPower = 20;
+      // 球飞向边线
+      const punchAngle = ball.y < player.y ? -Math.PI / 4 : Math.PI / 4;
+      ball.shoot(punchPower, punchAngle, false);
+      soundSystem.playShoot();
+    }
+  }
+
   _goalkeeperSave(player) {
     // 获取守门员面向方向
     const dirX = Math.cos(player.direction);
