@@ -75,9 +75,12 @@ export class AIController {
       }
     } else {
       // 前锋：进攻为主
-      if (ball.isHeld) {
+      if (ball.isHeld && ball.holder === player) {
+        // 自己带球，进攻！
+        this.aiStates.set(player, 'attack');
+      } else if (ball.isHeld) {
         if (ball.holder.team === 'B') {
-          // 队友带球，支援
+          // 队友带球，支援（在队友身后，不要挡路）
           this.aiStates.set(player, 'support');
         } else {
           // 对方带球，追球
@@ -117,32 +120,36 @@ export class AIController {
         break;
 
       case 'chase_ball':
-        // 追球
-        if (ball.isHeld && ball.holder.team === 'B') {
-          // 队友带球，去支援（在持球者身后，朝向己方球门方向）
-          const holder = ball.holder;
-          targetX = holder.x + 30; // 30是朝向己方球门方向的偏移
-          targetY = holder.y;
-        } else {
+        // 追球 - 只追自由球或对方持有的球，不追队友持有的球
+        if (ball.isHeld && ball.holder.team === 'A') {
+          // 追对方球员持有的球
           targetX = ball.x;
           targetY = ball.y;
+        } else if (!ball.isHeld) {
+          // 追自由球
+          targetX = ball.x;
+          targetY = ball.y;
+        } else {
+          // 队友持有球，应该去支援而不是追球
+          targetX = goalToDefend.x + 200;
+          targetY = this.field.getCenter().y;
         }
         break;
 
       case 'attack':
-        // 带球进攻
+        // 带球进攻 - 朝对方球门移动，速度较慢
         targetX = goalToAttack.x;
         targetY = goalToAttack.y;
-        speed = GAME_CONFIG.AI.ATTACK_SPEED;
+        speed = GAME_CONFIG.AI.CHASE_SPEED; // 和普通移动一样慢
         break;
 
       case 'support':
-        // 支援 - 在持球者和己方球门之间位置，不要跑到持球者前方
+        // 支援 - 在球场的进攻方向，在持球者前方稍偏的位置
         if (ball.holder && ball.holder.team === 'B') {
           const holder = ball.holder;
-          // 位置在持球者和己方球门中间
-          targetX = (holder.x + goalToDefend.x) / 2;
-          targetY = (holder.y + goalToDefend.y) / 2;
+          // 在持球者前方跑位（朝向对方球门方向）
+          targetX = holder.x - 40; // 在持球者后方（持球者面朝对方球门时，前方是对方半场）
+          targetY = holder.y;
         } else {
           // 球自由时追球
           targetX = ball.x;
