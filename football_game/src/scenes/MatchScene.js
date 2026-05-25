@@ -710,6 +710,7 @@ export class MatchScene {
   _renderBall() {
     const ctx = this.renderer.ctx;
     const frame = this.ball.animFrame; // 使用球的动画帧
+    const ballRadius = GAME_CONFIG.BALL.RADIUS;
 
     // 普通球或火焰球
     if (this.ball.isFlame) {
@@ -741,31 +742,51 @@ export class MatchScene {
       ctx.arc(this.ball.x, this.ball.y, flameBall.center.r, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      const normalBall = BallSpriteGenerator.getNormalBall(frame);
+      // === 普通球3D效果 ===
 
-      // 球本体
-      ctx.fillStyle = normalBall.pixels[0].c;
+      // 1. 球阴影（椭圆形，在球下方）
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
       ctx.beginPath();
-      ctx.arc(this.ball.x, this.ball.y, normalBall.pixels[0].r, 0, Math.PI * 2);
+      ctx.ellipse(this.ball.x + 2, this.ball.y + ballRadius + 2, ballRadius * 0.8, 3, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 黑色五边形图案
-      ctx.fillStyle = normalBall.pixels[1].c;
+      // 2. 球主体（径向渐变模拟球面光泽）
+      const ballGrad = ctx.createRadialGradient(
+        this.ball.x - ballRadius * 0.3, this.ball.y - ballRadius * 0.3, 0,  // 高光点（左上）
+        this.ball.x, this.ball.y, ballRadius  // 球心到边缘
+      );
+      ballGrad.addColorStop(0, '#ffffff');      // 高光白色
+      ballGrad.addColorStop(0.3, '#f5f5f5');    // 略暗白
+      ballGrad.addColorStop(0.7, '#e0e0e0');    // 灰色
+      ballGrad.addColorStop(1, '#b0b0b0');     // 边缘阴影
+      ctx.fillStyle = ballGrad;
       ctx.beginPath();
-      const patternX = this.ball.x - normalBall.pixels[1].w / 2 + normalBall.pixels[1].x + normalBall.pixels[1].w / 2;
-      const patternY = this.ball.y - normalBall.pixels[1].h / 2 + normalBall.pixels[1].y + normalBall.pixels[1].h / 2;
+      ctx.arc(this.ball.x, this.ball.y, ballRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. 黑色五边形图案（足球格纹）
+      ctx.fillStyle = '#333333';
+      ctx.beginPath();
+      const patternX = this.ball.x + 0;
+      const patternY = this.ball.y - 2;
       ctx.moveTo(patternX, patternY - 2);
       ctx.lineTo(patternX + 2, patternY + 1);
       ctx.lineTo(patternX - 2, patternY + 1);
       ctx.closePath();
       ctx.fill();
 
-      // 球边框
-      ctx.strokeStyle = '#333';
+      // 4. 球边框（深色轮廓）
+      ctx.strokeStyle = '#555555';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(this.ball.x, this.ball.y, GAME_CONFIG.BALL.RADIUS, 0, Math.PI * 2);
+      ctx.arc(this.ball.x, this.ball.y, ballRadius, 0, Math.PI * 2);
       ctx.stroke();
+
+      // 5. 高光点（左上角强光源）
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.beginPath();
+      ctx.arc(this.ball.x - ballRadius * 0.35, this.ball.y - ballRadius * 0.35, ballRadius * 0.2, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
