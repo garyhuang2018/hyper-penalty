@@ -74,5 +74,5 @@ export const KEYS = {
   E: 'KeyE',  // 换人
   SHIFT: 'ShiftLeft',  // 加速
   J: 'KeyJ',  // 传球(带球)/铲球(无球)
-  K: 'KeyK',  // 射门(带球)/撞人(无球)
+  K: 'KeyK',  // 射门(带球)/撞人(无球) / 倒钩(后+B,跳起时)
 };

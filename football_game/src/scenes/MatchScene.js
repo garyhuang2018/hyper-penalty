@@ -229,6 +229,9 @@ export class MatchScene {
     this._abPressTimes = [];
     this._abWindow = 500; // 500ms内连按触发无敌扑救
 
+    // 方向键状态追踪（用于必杀技判定）
+    this._directionState = { up: false, down: false, left: false, right: false };
+
     // 注册输入
     this._registerInput();
 
@@ -249,14 +252,23 @@ export class MatchScene {
 
   _registerInput() {
     // 移动
-    this.inputManager.onKeyDown(KEYS.UP, () => this._move(0, -1));
-    this.inputManager.onKeyDown(KEYS.DOWN, () => this._move(0, 1));
-    this.inputManager.onKeyDown(KEYS.LEFT, () => this._move(-1, 0));
-    this.inputManager.onKeyDown(KEYS.RIGHT, () => this._move(1, 0));
-    this.inputManager.onKeyDown(KEYS.W, () => this._move(0, -1));
-    this.inputManager.onKeyDown(KEYS.S, () => this._move(0, 1));
-    this.inputManager.onKeyDown(KEYS.A, () => this._move(-1, 0));
-    this.inputManager.onKeyDown(KEYS.D, () => this._move(1, 0));
+    this.inputManager.onKeyDown(KEYS.UP, () => { this._move(0, -1); this._directionState.up = true; });
+    this.inputManager.onKeyDown(KEYS.DOWN, () => { this._move(0, 1); this._directionState.down = true; });
+    this.inputManager.onKeyDown(KEYS.LEFT, () => { this._move(-1, 0); this._directionState.left = true; });
+    this.inputManager.onKeyDown(KEYS.RIGHT, () => { this._move(1, 0); this._directionState.right = true; });
+    this.inputManager.onKeyDown(KEYS.W, () => { this._move(0, -1); this._directionState.up = true; });
+    this.inputManager.onKeyDown(KEYS.S, () => { this._move(0, 1); this._directionState.down = true; });
+    this.inputManager.onKeyDown(KEYS.A, () => { this._move(-1, 0); this._directionState.left = true; });
+    this.inputManager.onKeyDown(KEYS.D, () => { this._move(1, 0); this._directionState.right = true; });
+
+    this.inputManager.onKeyUp(KEYS.UP, () => { this._directionState.up = false; });
+    this.inputManager.onKeyUp(KEYS.DOWN, () => { this._directionState.down = false; });
+    this.inputManager.onKeyUp(KEYS.LEFT, () => { this._directionState.left = false; });
+    this.inputManager.onKeyUp(KEYS.RIGHT, () => { this._directionState.right = false; });
+    this.inputManager.onKeyUp(KEYS.W, () => { this._directionState.up = false; });
+    this.inputManager.onKeyUp(KEYS.S, () => { this._directionState.down = false; });
+    this.inputManager.onKeyUp(KEYS.A, () => { this._directionState.left = false; });
+    this.inputManager.onKeyUp(KEYS.D, () => { this._directionState.right = false; });
 
     // 加速（按住 Shift）
     this.inputManager.onKeyDown(KEYS.SHIFT, () => this._startAccelerate());
@@ -300,12 +312,38 @@ export class MatchScene {
     if (!player) return;
 
     if (this.ball.holder === player) {
-      // 带球时传球
-      this._pass(player);
+      // 带球时按方向+J = 吊射（高弧线慢速）
+      if (this._hasDirectionInput()) {
+        this._lobShot(player);
+      } else {
+        // 普通传球
+        this._pass(player);
+      }
     } else {
       // 无球时铲球
       this._tackle(player);
     }
+  }
+
+  // 吊射（传球键+方向）
+  _lobShot(player) {
+    const ball = this.ball;
+    // 计算方向：基于当前输入方向
+    let dirX = 0, dirY = 0;
+    if (this._directionState.up) dirY = -1;
+    if (this._directionState.down) dirY = 1;
+    if (this._directionState.left) dirX = -1;
+    if (this._directionState.right) dirX = 1;
+    // 如果没有方向输入，使用朝向
+    if (dirX === 0 && dirY === 0) {
+      dirX = Math.cos(player.direction);
+      dirY = Math.sin(player.direction);
+    }
+
+    const angle = Math.atan2(dirY, dirX);
+    ball.lobShot(10, angle); // 吊射：慢速高弧线
+
+    soundSystem.playShoot();
   }
 
   _handleK() {
@@ -320,7 +358,20 @@ export class MatchScene {
     }
 
     if (this.ball.holder === player) {
-      // 带球跳起+射门 = 必杀技高跳射门
+      // 带球时
+      // 跳起中 + 方向 + K = 鱼跃头球
+      if (player.isJumping && this._hasDirectionInput()) {
+        if (this._tryDivingHeader(player)) {
+          return;
+        }
+      }
+      // 跳起中 + 后 + K = 倒钩射门
+      if (player.isJumping && this._isPressingBack()) {
+        if (this._tryBicycleKick(player)) {
+          return;
+        }
+      }
+      // 普通跳起 + K = 高跳射门必杀
       if (player.isJumping) {
         this._shoot(player);
       } else {
@@ -337,17 +388,146 @@ export class MatchScene {
     }
   }
 
-  // 尝试头撞（奔跑中面向方向且按前）
+  // 尝试头撞
   _tryHeader(player) {
     if (player.state !== 'running') return false;
+    if (!this._isBallNear(player)) return false;
+    return this._header(player);
+  }
 
-    // 检查是否按住了前方向（根据玩家朝向判断）
-    const isPressingForward = true; // 简化：只要在跑动就认为面向前方
+  // 检查是否有方向输入
+  _hasDirectionInput() {
+    return this._directionState.up || this._directionState.down ||
+           this._directionState.left || this._directionState.right;
+  }
 
-    if (isPressingForward && this._isBallNear(player)) {
-      return this._header(player);
+  // 检查是否按了"后"方向（相对于球员朝向）
+  _isPressingBack() {
+    const player = this._getActivePlayer();
+    if (!player) return false;
+    // 获取球员朝向
+    const dirX = Math.cos(player.direction);
+    const dirY = Math.sin(player.direction);
+    // 判断输入方向是否与朝向相反
+    let inputX = 0, inputY = 0;
+    if (this._directionState.up || this._directionState.W) inputY = -1;
+    if (this._directionState.down || this._directionState.S) inputY = 1;
+    if (this._directionState.left || this._directionState.A) inputX = -1;
+    if (this._directionState.right || this._directionState.D) inputX = 1;
+    // 点积为负表示向后
+    const dot = inputX * dirX + inputY * dirY;
+    return dot < -0.5;
+  }
+
+  // 尝试鱼跃头球
+  _tryDivingHeader(player) {
+    if (!player.isJumping) return false;
+    if (!this.ball.holder === player) return false;
+    return this._divingHeader(player);
+  }
+
+  // 尝试倒钩射门
+  _tryBicycleKick(player) {
+    if (!player.isJumping) return false;
+    if (!this.ball.holder === player) return false;
+    return this._bicycleKick(player);
+  }
+
+  // 头撞必杀
+  _header(player) {
+    const ball = this.ball;
+    // 释放球并向上击出
+    if (ball.holder === player) {
+      ball.release();
     }
-    return false;
+
+    // 计算头球方向：朝向对方球门并向上
+    const goalDir = player.team === 'A' ? 1 : -1;
+    const angle = Math.atan2(-0.5, goalDir);
+    ball.loft(12, angle);
+
+    // 撞到对方可能倒地
+    const opponent = this._findNearestOpponent(player);
+    if (opponent) {
+      const dist = Math.sqrt((opponent.x - player.x) ** 2 + (opponent.y - player.y) ** 2);
+      if (dist < player.radius + opponent.radius + 20) {
+        if (Math.random() < 0.5) {
+          opponent.knockDown();
+        }
+        if (Math.random() < 0.2) {
+          player.knockDown();
+        }
+      }
+    }
+
+    soundSystem.playShoot();
+    return true;
+  }
+
+  // 鱼跃头球
+  _divingHeader(player) {
+    const ball = this.ball;
+    // 释放球
+    if (ball.holder === player) {
+      ball.release();
+    }
+
+    // 计算方向：基于当前输入方向
+    let dirX = 0, dirY = 0;
+    if (this._directionState.up) dirY = -1;
+    if (this._directionState.down) dirY = 1;
+    if (this._directionState.left) dirX = -1;
+    if (this._directionState.right) dirX = 1;
+    // 如果没有方向输入，使用朝向
+    if (dirX === 0 && dirY === 0) {
+      dirX = Math.cos(player.direction);
+      dirY = Math.sin(player.direction);
+    }
+
+    const angle = Math.atan2(dirY, dirX);
+    ball.divingHeader(14, angle);
+
+    // 鱼跃可能撞倒对手
+    const opponent = this._findNearestOpponent(player);
+    if (opponent) {
+      const dist = Math.sqrt((opponent.x - player.x) ** 2 + (opponent.y - player.y) ** 2);
+      if (dist < player.radius + opponent.radius + 30) {
+        if (Math.random() < 0.6) {
+          opponent.knockDown();
+        }
+      }
+    }
+
+    soundSystem.playShoot();
+    return true;
+  }
+
+  // 倒钩射门
+  _bicycleKick(player) {
+    const ball = this.ball;
+    // 释放球
+    if (ball.holder === player) {
+      ball.release();
+    }
+
+    // 方向朝向对方球门
+    const goalDir = player.team === 'A' ? 1 : -1;
+    const angle = Math.atan2(-0.3, goalDir);
+    ball.bicycleKick(16, angle);
+
+    // 可能撞倒对手
+    const opponent = this._findNearestOpponent(player);
+    if (opponent) {
+      const dist = Math.sqrt((opponent.x - player.x) ** 2 + (opponent.y - player.y) ** 2);
+      if (dist < player.radius + opponent.radius + 25) {
+        if (Math.random() < 0.4) {
+          opponent.knockDown();
+        }
+      }
+    }
+
+    soundSystem.playShoot();
+    return true;
   }
 
   _handleJump() {

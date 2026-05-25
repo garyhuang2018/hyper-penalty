@@ -52,6 +52,10 @@ export class Player {
     this.dribbleSteps = 0;
     this.isFlame = false;
 
+    // 必杀技状态
+    this.isDiving = false;   // 鱼跃状态
+    this.isBicycleKicking = false; // 倒钩状态
+
     // 自然移动属性
     this.turnSpeed = 0.08;  // 转向速度 (0-1，越大转向越快)
     this.dribblePhase = 0;  // 带球弧线相位
@@ -236,6 +240,22 @@ export class Player {
     return true;
   }
 
+  // 鱼跃头球（跳起+方向+K触发）
+  startDiving(dx, dy) {
+    if (!this.isJumping) return false;
+    this.isDiving = true;
+    this.divingDirX = dx;
+    this.divingDirY = dy;
+    return true;
+  }
+
+  // 倒钩射门（跳起时按后+B）
+  startBicycleKick() {
+    if (!this.isJumping) return false;
+    this.isBicycleKicking = true;
+    return true;
+  }
+
   // 是否持有球
   _hasBall() {
     return this.ball && this.ball.holder === this;
@@ -311,6 +331,8 @@ export class Player {
       if (this.jumpTimer <= 0) {
         this.isJumping = false;
         this.jumpHeight = 0;
+        this.isDiving = false;
+        this.isBicycleKicking = false;
       } else {
         // 计算跳起高度（抛物线）
         const progress = 1 - (this.jumpTimer / 500);

@@ -79,6 +79,39 @@ export class Ball {
     this.loftHeight = 40; // 挑球最高高度
   }
 
+  // 吊射（高弧线慢速）
+  lobShot(power, direction) {
+    this.isHeld = false;
+    this.holder = null;
+    this.vx = Math.cos(direction) * power * 0.5; // 慢速
+    this.vy = Math.sin(direction) * power * 0.5;
+    this.isLofted = true;
+    this.loftHeight = 60; // 高弧线
+  }
+
+  // 倒钩射门（向后上方踢）
+  bicycleKick(power, direction) {
+    this.isHeld = false;
+    this.holder = null;
+    // 倒钩方向偏后上方
+    const kickAngle = direction - Math.PI * 0.7; // 向后上方偏移
+    this.vx = Math.cos(kickAngle) * power * 1.2;
+    this.vy = Math.sin(kickAngle) * power * 1.2;
+    this.isLofted = true;
+    this.loftHeight = 50;
+    this.isFlame = true; // 倒钩必定是火焰球
+  }
+
+  // 鱼跃头球（水平飞行）
+  divingHeader(power, direction) {
+    this.isHeld = false;
+    this.holder = null;
+    this.vx = Math.cos(direction) * power * 1.1;
+    this.vy = Math.sin(direction) * power * 0.3; // 水平方向为主
+    this.isLofted = true;
+    this.loftHeight = 15; // 低弧线
+  }
+
   // 传球飞行
   pass(power, direction) {
     this.isHeld = false;
