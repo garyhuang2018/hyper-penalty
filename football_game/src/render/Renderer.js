@@ -202,49 +202,83 @@ export class Renderer {
     );
   }
 
-  // 绘制球门
+  // 绘制球门 - 3D立体效果
   drawGoals() {
     const field = GAME_CONFIG.FIELD;
     const goal = GAME_CONFIG.GOAL;
     const ctx = this.ctx;
 
-    // 左侧球门（蓝队防守，红队进攻）
-    ctx.fillStyle = '#3498db';
-    ctx.fillRect(
+    // === 左侧球门（蓝队防守） ===
+    this._drawSingleGoal(
       field.OFFSET_X - goal.WIDTH,
       field.OFFSET_Y + (field.HEIGHT - goal.HEIGHT) / 2,
       goal.WIDTH,
-      goal.HEIGHT
+      goal.HEIGHT,
+      '#3498db'
     );
 
-    // 左侧球门框
+    // === 右侧球门（红队防守） ===
+    this._drawSingleGoal(
+      field.OFFSET_X + field.WIDTH,
+      field.OFFSET_Y + (field.HEIGHT - goal.HEIGHT) / 2,
+      goal.WIDTH,
+      goal.HEIGHT,
+      '#e74c3c'
+    );
+  }
+
+  // 绘制单个球门（3D厚度效果）
+  _drawSingleGoal(x, y, width, height, teamColor) {
+    const ctx = this.ctx;
+    const THICKNESS = 10;  // 门框厚度
+
+    // 1. 阴影层（底层，向右向下偏移）
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(x - THICKNESS + 4, y - THICKNESS + 4, width + THICKNESS * 2, height + THICKNESS * 2);
+
+    // 2. 最外层门框（深色，厚度10px）
+    ctx.fillStyle = darken(teamColor, 50);
+    ctx.fillRect(x - THICKNESS, y - THICKNESS, width + THICKNESS * 2, height + THICKNESS * 2);
+
+    // 3. 中间层（球队色）
+    ctx.fillStyle = teamColor;
+    ctx.fillRect(x, y, width, height);
+
+    // 4. 内层深度（径向渐变，模拟球门内部深度）
+    const innerGrad = ctx.createRadialGradient(
+      x + width / 2, y + height / 2, 3,
+      x + width / 2, y + height / 2, Math.max(width, height) * 0.6
+    );
+    innerGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
+    innerGrad.addColorStop(0.5, 'rgba(0,0,0,0.25)');
+    innerGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = innerGrad;
+    ctx.fillRect(x + 3, y + 3, width - 6, height - 6);
+
+    // 5. 左侧门柱（白色高光，厚度4px）
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x - THICKNESS - 3, y - THICKNESS - 3, 6, height + THICKNESS * 2 + 6);
+    // 门柱阴影
+    ctx.fillStyle = darken(teamColor, 30);
+    ctx.fillRect(x - THICKNESS + 2, y - THICKNESS + 2, 4, height + THICKNESS * 2 - 4);
+
+    // 6. 顶部横梁高光
+    ctx.fillStyle = lighten(teamColor, 40);
+    ctx.fillRect(x - THICKNESS, y - THICKNESS, width + THICKNESS * 2, 4);
+
+    // 7. 底部阴影线
+    ctx.fillStyle = darken(teamColor, 40);
+    ctx.fillRect(x - THICKNESS, y + height - 2, width + THICKNESS * 2, 4);
+
+    // 8. 外边框（白色轮廓，增强立体感）
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(
-      field.OFFSET_X - goal.WIDTH,
-      field.OFFSET_Y + (field.HEIGHT - goal.HEIGHT) / 2,
-      goal.WIDTH,
-      goal.HEIGHT
-    );
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - THICKNESS, y - THICKNESS, width + THICKNESS * 2, height + THICKNESS * 2);
 
-    // 右侧球门（红队防守，蓝队进攻）
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(
-      field.OFFSET_X + field.WIDTH,
-      field.OFFSET_Y + (field.HEIGHT - goal.HEIGHT) / 2,
-      goal.WIDTH,
-      goal.HEIGHT
-    );
-
-    // 右侧球门框
-    ctx.strokeRect(
-      field.OFFSET_X + field.WIDTH,
-      field.OFFSET_Y + (field.HEIGHT - goal.HEIGHT) / 2,
-      goal.WIDTH,
-      goal.HEIGHT
-    );
-
-    ctx.lineWidth = field.LINE_WIDTH;
+    // 9. 内边框（深色内壁线）
+    ctx.strokeStyle = darken(teamColor, 25);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 3, y + 3, width - 6, height - 6);
   }
 
   // 绘制圆形（用于玩家/球 占位）
