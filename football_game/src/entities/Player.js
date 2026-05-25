@@ -67,9 +67,13 @@ export class Player {
       this.direction = Math.atan2(dy, dx);
     }
 
+    // 铲球状态速度 × 1.2
+    const speedMultiplier = this.getTackleSpeedMultiplier();
+    const currentSpeed = this.speed * speedMultiplier;
+
     // 计算新位置
-    let newX = this.x + dx * this.speed;
-    let newY = this.y + dy * this.speed;
+    let newX = this.x + dx * currentSpeed;
+    let newY = this.y + dy * currentSpeed;
 
     // 约束到有效区域
     newX = Math.max(this.minX, Math.min(this.maxX, newX));
@@ -91,7 +95,20 @@ export class Player {
   tackle() {
     if (this.state === 'knocked_down' || this.state === 'getting_up') return false;
     this.state = 'tackling';
+
+    // 0.3秒后恢复
+    setTimeout(() => {
+      if (this.state === 'tackling') {
+        this.state = 'idle';
+      }
+    }, 300);
+
     return true;
+  }
+
+  // 获取铲球时的速度倍率
+  getTackleSpeedMultiplier() {
+    return this.state === 'tackling' ? 1.2 : 1.0;
   }
 
   // 射门

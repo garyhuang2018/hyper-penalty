@@ -257,4 +257,176 @@ export class Renderer {
     ctx.textBaseline = baseline;
     ctx.fillText(text, x, y);
   }
+
+  // 绘制球员像素精灵
+  drawPlayer(player) {
+    const ctx = this.ctx;
+    const { x, y, direction, team, state, animFrame } = player;
+
+    // 皮肤色
+    const skinColor = '#f5c5a3';
+    // 球队色
+    const teamColor = team === 'A' ? '#e74c3c' : '#3498db';
+    // 深色（腿）
+    const darkColor = '#222222';
+
+    // 保存当前状态
+    ctx.save();
+    ctx.translate(x, y);
+
+    // 根据朝向翻转
+    const facingRight = Math.cos(direction) >= 0;
+    if (!facingRight) {
+      ctx.scale(-1, 1);
+    }
+
+    // 绘制状态
+    if (state === 'knocked_down' || state === 'getting_up') {
+      // 倒地状态 - 横向绘制
+      this._drawKnockedDownPlayer(skinColor, teamColor, darkColor);
+    } else if (state === 'shooting') {
+      // 射门状态
+      this._drawShootingPlayer(skinColor, teamColor, darkColor);
+    } else if (state === 'tackling') {
+      // 铲球状态 - 低姿态滑铲
+      this._drawTacklingPlayer(skinColor, teamColor, darkColor);
+    } else {
+      // 站立/跑步状态
+      const legOffset = state === 'running' ? Math.sin(animFrame * Math.PI / 2) * 3 : 0;
+      const armOffset = state === 'running' ? Math.sin(animFrame * Math.PI / 2) * 2 : 0;
+      this._drawStandingPlayer(skinColor, teamColor, darkColor, legOffset, armOffset);
+    }
+
+    ctx.restore();
+  }
+
+  // 站立/跑步姿态
+  _drawStandingPlayer(skinColor, teamColor, darkColor, legOffset, armOffset) {
+    const ctx = this.ctx;
+
+    // 头发 (6x3 px) - 顶部
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-3, -23, 6, 3);
+
+    // 头部 (8x6 px) - 眼睛区域
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-4, -20, 8, 6);
+
+    // 眼睛 (2x2 px, 每个)
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(-3, -18, 2, 2);
+    ctx.fillRect(1, -18, 2, 2);
+
+    // 身体/球衣 (10x10 px)
+    ctx.fillStyle = teamColor;
+    ctx.fillRect(-5, -14, 10, 10);
+
+    // 手臂 (3x8 px, 每个) - 稍微偏移模拟摆动
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-8, -12, 3, 8 + armOffset);
+    ctx.fillRect(5, -12, 3, 8 - armOffset);
+
+    // 腿 (4x10 px, 每条) - 交替前后
+    ctx.fillStyle = darkColor;
+    ctx.fillRect(-3, -4 + legOffset, 4, 10);
+    ctx.fillRect(-1, -4 - legOffset, 4, 10);
+  }
+
+  // 射门姿态
+  _drawShootingPlayer(skinColor, teamColor, darkColor) {
+    const ctx = this.ctx;
+
+    // 头发
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-3, -23, 6, 3);
+
+    // 头部
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-4, -20, 8, 6);
+
+    // 眼睛
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(-3, -18, 2, 2);
+    ctx.fillRect(1, -18, 2, 2);
+
+    // 身体
+    ctx.fillStyle = teamColor;
+    ctx.fillRect(-5, -14, 10, 10);
+
+    // 支撑腿
+    ctx.fillStyle = darkColor;
+    ctx.fillRect(-3, -4, 4, 10);
+
+    // 踢球腿（向前伸）
+    ctx.fillRect(5, -8, 4, 6);
+
+    // 手臂（向后摆保持平衡）
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-8, -12, 3, 6);
+    ctx.fillRect(5, -12, 3, 4);
+  }
+
+  // 倒地姿态
+  _drawKnockedDownPlayer(skinColor, teamColor, darkColor) {
+    const ctx = this.ctx;
+
+    // 横向躺倒 - 身体旋转90度
+    // 头发
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-23, -3, 6, 3);
+
+    // 头部
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-20, -4, 8, 6);
+
+    // 眼睛
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(-18, -3, 2, 2);
+    ctx.fillRect(-14, -3, 2, 2);
+
+    // 身体
+    ctx.fillStyle = teamColor;
+    ctx.fillRect(-12, -5, 10, 10);
+
+    // 手臂（向前伸）
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-4, -8, 3, 8);
+    ctx.fillRect(-4, 2, 3, 8);
+
+    // 腿
+    ctx.fillStyle = darkColor;
+    ctx.fillRect(-2, -4, 10, 4);
+    ctx.fillRect(-2, 2, 10, 4);
+  }
+
+  // 铲球姿态
+  _drawTacklingPlayer(skinColor, teamColor, darkColor) {
+    const ctx = this.ctx;
+
+    // 头发
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-3, -12, 6, 3);
+
+    // 头部（低姿态）
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-4, -9, 8, 6);
+
+    // 眼睛
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(-3, -7, 2, 2);
+    ctx.fillRect(1, -7, 2, 2);
+
+    // 身体（倾斜，滑铲姿态）
+    ctx.fillStyle = teamColor;
+    ctx.fillRect(-6, -3, 12, 6);
+
+    // 手臂（向前伸准备铲球）
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(4, -5, 3, 8);
+
+    // 腿（踢出）
+    ctx.fillStyle = darkColor;
+    ctx.fillRect(6, 3, 8, 3);
+    ctx.fillRect(-8, 2, 6, 3);
+  }
 }

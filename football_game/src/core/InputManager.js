@@ -72,4 +72,5 @@ export const KEYS = {
   ENTER: 'Enter',
   Q: 'KeyQ',  // 换人
   E: 'KeyE',  // 换人
+  SHIFT: 'ShiftLeft',  // 铲球
 };

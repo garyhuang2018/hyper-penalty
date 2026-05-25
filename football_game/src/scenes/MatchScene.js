@@ -261,6 +261,17 @@ export class MatchScene {
     // 换人
     this.inputManager.onKeyDown(KEYS.Q, () => this._switchPlayer(-1));
     this.inputManager.onKeyDown(KEYS.E, () => this._switchPlayer(1));
+
+    // 铲球
+    this.inputManager.onKeyDown(KEYS.SHIFT, () => this._tackle());
+  }
+
+  _tackle() {
+    if (this.matchController.isPaused()) return;
+    const activePlayer = this._getActivePlayer();
+    if (activePlayer) {
+      activePlayer.tackle();
+    }
   }
 
   _move(dx, dy) {
@@ -358,36 +369,8 @@ export class MatchScene {
     const ctx = this.renderer.ctx;
     const isActive = player.team === 'A' && this.players.filter(p => p.team === 'A').indexOf(player) === this.activePlayerIndex;
 
-    // 获取精灵图
-    const sprite = SpriteGenerator.generatePlayerSprite(
-      player.team,
-      player.state,
-      player.animFrame,
-      player.direction
-    );
-
-    // 保存上下文状态
-    ctx.save();
-
-    // 翻转处理
-    if (sprite.flip) {
-      ctx.translate(player.x, player.y);
-      ctx.scale(-1, 1);
-      ctx.translate(-player.x, -player.y);
-    }
-
-    // 绘制像素精灵
-    sprite.pixels.forEach(px => {
-      ctx.fillStyle = px.c;
-      ctx.fillRect(
-        Math.round(player.x + px.x - px.w / 2),
-        Math.round(player.y + px.y - px.h / 2),
-        px.w,
-        px.h
-      );
-    });
-
-    ctx.restore();
+    // 使用 Renderer 的 drawPlayer 方法绘制像素精灵
+    this.renderer.drawPlayer(player);
 
     // 当前控制球员标记（光环）
     if (isActive) {

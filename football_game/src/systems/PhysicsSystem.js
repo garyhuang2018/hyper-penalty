@@ -26,16 +26,14 @@ export class PhysicsSystem {
     // 球已经在某球员控制下，跳过
     if (ball.isHeld) return;
 
-    // 静止的球可以被任何靠近的球员捡起
-    if (!ball.isMoving()) {
-      for (const player of this.players) {
-        if (player.state === 'knocked_down' || player.state === 'getting_up') continue;
+    // 接触即持有（移动中的球也可以被捡起）
+    for (const player of this.players) {
+      if (player.state === 'knocked_down' || player.state === 'getting_up') continue;
 
-        const dist = ball.distanceTo(player);
-        if (dist < player.radius + ball.radius + 5) {
-          ball.hold(player);
-          return;
-        }
+      const dist = ball.distanceTo(player);
+      if (dist < player.radius + ball.radius + 5) {
+        ball.hold(player);
+        return;
       }
     }
   }
@@ -96,13 +94,22 @@ export class PhysicsSystem {
         if (player.team === holder.team) continue;
         if (player.state === 'knocked_down' || player.state === 'getting_up') continue;
 
+        // 铲球条件：tackling 状态 + 距离 < 30px + 速度 > 3
         const dist = ball.distanceTo(player);
-        if (dist < holder.radius + player.radius + 10) {
-          // 铲球成功
-          if (Math.random() < 0.6) { // 60% 成功率
+        const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+
+        if (player.state === 'tackling' && dist < 30 && speed > 3) {
+          // 70% 成功率
+          const successRate = 0.7;
+          if (Math.random() < successRate) {
+            // 抢断成功
             ball.release();
-            player.knockDown();
             holder.knockDown();
+          } else {
+            // 抢断失败，防守者可能倒地
+            if (Math.random() < 0.3) {
+              player.knockDown();
+            }
           }
         }
       }
