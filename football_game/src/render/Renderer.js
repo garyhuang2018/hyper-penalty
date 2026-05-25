@@ -420,14 +420,18 @@ export class Renderer {
   _drawStandingPlayer(skinColor, teamColor, darkColor, legOffset, armOffset) {
     const ctx = this.ctx;
 
-    // 头发 (6x3 px) - 顶部高光
-    ctx.fillStyle = lighten(skinColor, 15);
+    // 头发 (6x3 px) - 顶部高光+底部阴影
+    const hairGrad = ctx.createLinearGradient(0, -23, 0, -20);
+    hairGrad.addColorStop(0, lighten(skinColor, 30));
+    hairGrad.addColorStop(1, skinColor);
+    ctx.fillStyle = hairGrad;
     ctx.fillRect(-3, -23, 6, 3);
 
-    // 头部 (8x6 px) - 渐变效果
+    // 头部 (8x6 px) - 渐变效果（光线从上方来）
     const headGrad = ctx.createLinearGradient(0, -20, 0, -14);
-    headGrad.addColorStop(0, lighten(skinColor, 20));
-    headGrad.addColorStop(1, darken(skinColor, 15));
+    headGrad.addColorStop(0, lighten(skinColor, 25));   // 头顶最亮
+    headGrad.addColorStop(0.4, skinColor);              // 中间正常
+    headGrad.addColorStop(1, darken(skinColor, 20));    // 下巴阴影
     ctx.fillStyle = headGrad;
     ctx.fillRect(-4, -20, 8, 6);
 
@@ -436,18 +440,20 @@ export class Renderer {
     ctx.fillRect(-3, -18, 2, 2);
     ctx.fillRect(1, -18, 2, 2);
 
-    // 身体/球衣 (10x10 px) - 渐变效果
+    // 身体/球衣 (10x10 px) - 渐变效果（光线从上方来）
     const bodyGrad = ctx.createLinearGradient(0, -14, 0, -4);
-    bodyGrad.addColorStop(0, lighten(teamColor, 25));
-    bodyGrad.addColorStop(0.5, teamColor);
-    bodyGrad.addColorStop(1, darken(teamColor, 25));
+    bodyGrad.addColorStop(0, lighten(teamColor, 30));   // 顶部高光
+    bodyGrad.addColorStop(0.3, lighten(teamColor, 15));  // 偏亮
+    bodyGrad.addColorStop(0.7, teamColor);               // 中间正常
+    bodyGrad.addColorStop(1, darken(teamColor, 30));    // 底部阴影
     ctx.fillStyle = bodyGrad;
     ctx.fillRect(-5, -14, 10, 10);
 
-    // 手臂 (3x8 px, 每个) - 渐变效果
+    // 手臂 (3x8 px, 每个) - 渐变效果（圆柱体感）
     const armGrad = ctx.createLinearGradient(0, -12, 0, -4);
-    armGrad.addColorStop(0, lighten(skinColor, 20));
-    armGrad.addColorStop(1, darken(skinColor, 15));
+    armGrad.addColorStop(0, lighten(skinColor, 30));    // 顶部高光
+    armGrad.addColorStop(0.3, lighten(skinColor, 15));  // 偏亮
+    armGrad.addColorStop(1, darken(skinColor, 25));    // 底部阴影
     ctx.fillStyle = armGrad;
     ctx.fillRect(-8, -12, 3, 8 + armOffset);
     ctx.fillRect(5, -12, 3, 8 - armOffset);
